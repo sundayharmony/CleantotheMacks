@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Book a Deep Clean - Clean To The Mack's</title>
+    <meta name="description" content="Book a professional deep cleaning service for your home or office. Choose residential or commercial cleaning.">
+    <link rel="canonical" href="https://cleantothemacks.com/book-deep-clean.html">
+    <meta property="og:title" content="Book a Deep Clean - Clean To The Mack's">
+    <meta property="og:description" content="Book a professional deep cleaning service for your home or office. Choose residential or commercial cleaning.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://cleantothemacks.com/book-deep-clean.html">
+    <meta property="og:image" content="https://cleantothemacks.com/logo.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Book a Deep Clean - Clean To The Mack's">
+    <meta name="twitter:description" content="Book a professional deep cleaning service for your home or office. Choose residential or commercial cleaning.">
+    <meta name="twitter:image" content="https://cleantothemacks.com/logo.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="bg-gray-50">
+    <!-- Navbar -->
+    <nav class="bg-white shadow-md sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <a href="index.html" class="flex items-center">
+                    <img src="logo.png" alt="Clean To The Mack's" class="h-12 w-auto" loading="eager">
+                </a>
+                
+                <!-- Desktop Navigation -->
+                <div class="hidden md:flex items-center space-x-8" data-desktop-nav>
+                    <a href="index.html" class="text-gray-700 hover:text-blue-600 transition font-medium">Home</a>
+                    <a href="our-work.html" class="text-gray-700 hover:text-blue-600 transition font-medium">Our Work</a>
+                    <a href="book-deep-clean.html" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition font-semibold">Book Deep Clean</a>
+                    <a href="membership.html" class="text-gray-700 hover:text-blue-600 transition font-medium" style="display: none;">Membership</a>
+                    <a href="signin.html" class="text-gray-700 hover:text-blue-600 transition font-medium">Sign In</a>
+                </div>
+
+                <!-- Mobile menu button -->
+                <div class="md:hidden">
+                    <button id="mobile-menu-button" class="text-gray-700 hover:text-blue-600 transition" aria-label="Toggle menu">
+                        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Mobile Navigation -->
+            <div id="mobile-menu" class="md:hidden hidden py-4 border-t border-gray-200" data-mobile-nav>
+                <div class="flex flex-col space-y-4">
+                    <a href="index.html" class="text-gray-700 hover:text-blue-600 transition font-medium">Home</a>
+                    <a href="our-work.html" class="text-gray-700 hover:text-blue-600 transition font-medium">Our Work</a>
+                    <a href="book-deep-clean.html" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition font-semibold text-center">Book Deep Clean</a>
+                    <a href="membership.html" class="text-gray-700 hover:text-blue-600 transition font-medium" style="display: none;">Membership</a>
+                    <a href="signin.html" class="text-gray-700 hover:text-blue-600 transition font-medium">Sign In</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="min-h-screen py-20">
+        <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-12">
+                <h1 class="text-4xl md:text-5xl font-bold mb-4">Book a Deep Clean</h1>
+                <p class="text-gray-600 text-lg">
+                    Tell us about your space and we'll provide a customized cleaning solution
+                </p>
+            </div>
+
+            <!-- Success Message (hidden by default) -->
+            <div id="success-message" class="hidden max-w-md mx-auto">
+                <div class="bg-blue-100 text-blue-800 p-8 rounded-lg text-center">
+                    <div class="text-6xl mb-4">✓</div>
+                    <h2 class="text-2xl font-bold mb-4">Submission Successful!</h2>
+                    <p class="mb-6">
+                        Thank you for your interest! We'll contact you soon to schedule your deep clean.
+                    </p>
+                    <div class="bg-white p-4 rounded-lg mb-4">
+                        <p class="text-gray-700 mb-3">
+                            Want to track your request? Create an account to view all your submissions!
+                        </p>
+                        <a href="signin.html" class="inline-block bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition">
+                            Create Account
+                        </a>
+                    </div>
+                    <a href="index.html" class="text-blue-600 hover:underline">
+                        Return to Home
+                    </a>
+                </div>
+            </div>
+
+            <!-- Form Container -->
+            <div id="form-container" class="bg-white rounded-lg shadow-md p-8">
+                <form id="intake-form" class="space-y-6">
+                    <!-- Property Type -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            Property Type *
+                        </label>
+                        <div class="flex gap-6 justify-center md:justify-start">
+                            <label class="flex items-center cursor-pointer">
+                                <input
+                                    type="radio"
+                                    name="propertyType"
+                                    value="residential"
+                                    checked
+                                    class="mr-2 w-4 h-4"
+                                    id="propertyType-residential"
+                                />
+                                <span class="text-gray-700">Residential</span>
+                            </label>
+                            <label class="flex items-center cursor-pointer">
+                                <input
+                                    type="radio"
+                                    name="propertyType"
+                                    value="commercial"
+                                    class="mr-2 w-4 h-4"
+                                    id="propertyType-commercial"
+                                />
+                                <span class="text-gray-700">Commercial</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Name and Email -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label for="name" class="block text-sm font-medium text-gray-700 mb-2">
+                                Name *
+                            </label>
+                            <input
+                                type="text"
+                                id="name"
+                                name="name"
+                                required
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                            />
+                        </div>
+                        <div>
+                            <label for="email" class="block text-sm font-medium text-gray-700 mb-2">
+                                Email *
+                            </label>
+                            <input
+                                type="email"
+                                id="email"
+                                name="email"
+                                required
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                            />
+                        </div>
+                    </div>
+
+                    <!-- Phone and Address -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label for="phone" class="block text-sm font-medium text-gray-700 mb-2">
+                                Phone *
+                            </label>
+                            <input
+                                type="tel"
+                                id="phone"
+                                name="phone"
+                                required
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                            />
+                        </div>
+                        <div>
+                            <label for="address" class="block text-sm font-medium text-gray-700 mb-2">
+                                Address *
+                            </label>
+                            <input
+                                type="text"
+                                id="address"
+                                name="address"
+                                required
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                            />
+                        </div>
+                    </div>
+
+                    <!-- Complexity (Common for both) -->
+                    <div>
+                        <label for="complexity" class="block text-sm font-medium text-gray-700 mb-2">
+                            Complexity *
+                        </label>
+                        <select
+                            id="complexity"
+                            name="complexity"
+                            required
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                        >
+                            <option value="">Select complexity</option>
+                            <option value="Simple">Simple</option>
+                            <option value="Moderate">Moderate</option>
+                            <option value="Complex">Complex</option>
+                        </select>
+                    </div>
+
+                    <!-- Residential Fields -->
+                    <div id="residential-fields">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label for="homeSize" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Home Size *
+                                </label>
+                                <select
+                                    id="homeSize"
+                                    name="homeSize"
+                                    required
+                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent residential-field"
+                                >
+                                    <option value="">Select home size</option>
+                                    <option value="1-2 bedrooms">1-2 bedrooms</option>
+                                    <option value="3-4 bedrooms">3-4 bedrooms</option>
+                                    <option value="5+ bedrooms">5+ bedrooms</option>
+                                    <option value="Studio">Studio</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Bedrooms, Bathrooms, Square Footage -->
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+                            <div>
+                                <label for="bedrooms" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Bedrooms *
+                                </label>
+                                <input
+                                    type="number"
+                                    id="bedrooms"
+                                    name="bedrooms"
+                                    min="0"
+                                    required
+                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent residential-field"
+                                />
+                            </div>
+                            <div>
+                                <label for="bathrooms" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Bathrooms *
+                                </label>
+                                <input
+                                    type="number"
+                                    id="bathrooms"
+                                    name="bathrooms"
+                                    min="0"
+                                    required
+                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent residential-field"
+                                />
+                            </div>
+                            <div>
+                                <label for="squareFootage" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Square Footage *
+                                </label>
+                                <input
+                                    type="number"
+                                    id="squareFootage"
+                                    name="squareFootage"
+                                    min="0"
+                                    required
+                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Commercial Fields -->
+                    <div id="commercial-fields" style="display: none;">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label for="businessName" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Business Name *
+                                </label>
+                                <input
+                                    type="text"
+                                    id="businessName"
+                                    name="businessName"
+                                    required
+                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent commercial-field"
+                                />
+                            </div>
+                            <div>
+                                <label for="officeType" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Office Type *
+                                </label>
+                                <select
+                                    id="officeType"
+                                    name="officeType"
+                                    required
+                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent commercial-field"
+                                >
+                                    <option value="">Select office type</option>
+                                    <option value="Office">Office</option>
+                                    <option value="Retail">Retail</option>
+                                    <option value="Warehouse">Warehouse</option>
+                                    <option value="Restaurant">Restaurant</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                            <div>
+                                <label for="numberOfFloors" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Number of Floors *
+                                </label>
+                                <input
+                                    type="number"
+                                    id="numberOfFloors"
+                                    name="numberOfFloors"
+                                    min="1"
+                                    required
+                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent commercial-field"
+                                />
+                            </div>
+                            <div>
+                                <label for="numberOfEmployees" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Number of Employees *
+                                </label>
+                                <input
+                                    type="number"
+                                    id="numberOfEmployees"
+                                    name="numberOfEmployees"
+                                    min="0"
+                                    required
+                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent commercial-field"
+                                />
+                            </div>
+                        </div>
+
+                        <div class="mt-6">
+                            <label for="squareFootageCommercial" class="block text-sm font-medium text-gray-700 mb-2">
+                                Square Footage *
+                            </label>
+                            <input
+                                type="number"
+                                id="squareFootageCommercial"
+                                name="squareFootageCommercial"
+                                min="0"
+                                required
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent commercial-field"
+                            />
+                        </div>
+                    </div>
+
+                    <!-- Preferred Date -->
+                    <div>
+                        <label for="preferredDate" class="block text-sm font-medium text-gray-700 mb-2">
+                            Preferred Date *
+                        </label>
+                        <input
+                            type="date"
+                            id="preferredDate"
+                            name="preferredDate"
+                            required
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                        />
+                    </div>
+
+                    <!-- Additional Info -->
+                    <div>
+                        <label for="additionalInfo" class="block text-sm font-medium text-gray-700 mb-2">
+                            Additional Information *
+                        </label>
+                        <textarea
+                            id="additionalInfo"
+                            name="additionalInfo"
+                            rows="4"
+                            required
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                            placeholder="Tell us anything else we should know about your cleaning needs..."
+                        ></textarea>
+                    </div>
+
+                    <div id="error-message" class="hidden bg-red-100 text-red-800 p-4 rounded-lg">
+                    </div>
+
+                    <div class="flex justify-center">
+                        <button
+                            type="submit"
+                            class="w-full md:w-auto px-8 bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            Submit Request
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900 text-white mt-20">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-8 items-start">
+                <div>
+                    <h3 class="text-xl font-bold mb-4">Clean To The Mack's</h3>
+                    <p class="text-gray-400 leading-relaxed">
+                        Professional cleaning services for your home or office.
+                    </p>
+                </div>
+                
+                <div>
+                    <h4 class="font-semibold mb-4 text-white">Services</h4>
+                    <ul class="space-y-2 text-gray-400">
+                        <li><a href="book-deep-clean.html" class="hover:text-white transition">Deep Clean</a></li>
+                        <li><a href="our-work.html" class="hover:text-white transition">Our Work</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h4 class="font-semibold mb-4 text-white">Company</h4>
+                    <ul class="space-y-2 text-gray-400">
+                        <li><a href="index.html" class="hover:text-white transition">About Us</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h4 class="font-semibold mb-4 text-white">Account</h4>
+                    <ul class="space-y-2 text-gray-400">
+                        <li><a href="signin.html" class="hover:text-white transition">Sign In</a></li>
+                        <li><a href="dashboard.html" class="hover:text-white transition">Dashboard</a></li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
+                <p>&copy; <script>document.write(new Date().getFullYear())</script> Clean To The Mack's. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="js/auth.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
+

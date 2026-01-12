@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Clean To The Mack's</title>
+    <meta name="description" content="Admin dashboard for managing bookings, users, and settings.">
+    <link rel="canonical" href="https://cleantothemacks.com/admin-dashboard.html">
+    <meta property="og:title" content="Admin Dashboard - Clean To The Mack's">
+    <meta property="og:description" content="Admin dashboard for managing bookings, users, and settings.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://cleantothemacks.com/admin-dashboard.html">
+    <meta property="og:image" content="https://cleantothemacks.com/logo.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Admin Dashboard - Clean To The Mack's">
+    <meta name="twitter:description" content="Admin dashboard for managing bookings, users, and settings.">
+    <meta name="twitter:image" content="https://cleantothemacks.com/logo.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="bg-gray-50">
+    <!-- Navbar -->
+    <nav class="bg-white shadow-md sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <a href="index.html" class="flex items-center">
+                    <img src="logo.png" alt="Clean To The Mack's" class="h-12 w-auto" loading="eager">
+                </a>
+                
+                <!-- Desktop Navigation -->
+                <div class="hidden md:flex items-center space-x-8" data-desktop-nav>
+                    <a href="index.html" class="text-gray-700 hover:text-blue-600 transition font-medium">Home</a>
+                    <a href="our-work.html" class="text-gray-700 hover:text-blue-600 transition font-medium">Our Work</a>
+                    <a href="book-deep-clean.html" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition font-semibold">Book Deep Clean</a>
+                    <a href="signin.html" class="text-gray-700 hover:text-blue-600 transition font-medium">Sign In</a>
+                </div>
+
+                <!-- Mobile menu button -->
+                <div class="md:hidden">
+                    <button id="mobile-menu-button" class="text-gray-700 hover:text-blue-600 transition" aria-label="Toggle menu">
+                        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Mobile Navigation -->
+            <div id="mobile-menu" class="md:hidden hidden py-4 border-t border-gray-200" data-mobile-nav>
+                <div class="flex flex-col space-y-4">
+                    <a href="index.html" class="text-gray-700 hover:text-blue-600 transition font-medium">Home</a>
+                    <a href="our-work.html" class="text-gray-700 hover:text-blue-600 transition font-medium">Our Work</a>
+                    <a href="book-deep-clean.html" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition font-semibold text-center">Book Deep Clean</a>
+                    <a href="membership.html" class="text-gray-700 hover:text-blue-600 transition font-medium" style="display: none;">Membership</a>
+                    <a href="admin-dashboard.html" class="text-gray-700 hover:text-blue-600 transition font-medium">Admin</a>
+                    <a href="signin.html" class="text-gray-700 hover:text-blue-600 transition font-medium">Sign Out</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="min-h-screen py-20">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h1 class="text-4xl md:text-5xl font-bold mb-8 text-center md:text-left">Admin Dashboard</h1>
+            
+            <div class="mb-8 bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-2xl font-semibold mb-4" id="welcome-message">Welcome, Admin!</h2>
+                <p class="text-gray-600 leading-relaxed">Manage all bookings, users, and view analytics.</p>
+            </div>
+
+            <!-- Statistics Overview -->
+            <div class="mb-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="bg-white rounded-lg shadow-md p-6 text-center">
+                    <h3 class="text-sm font-medium text-gray-500 mb-2">Total Bookings</h3>
+                    <p class="text-3xl font-bold text-blue-600" id="stat-total">0</p>
+                </div>
+                <div class="bg-white rounded-lg shadow-md p-6 text-center">
+                    <h3 class="text-sm font-medium text-gray-500 mb-2">Pending</h3>
+                    <p class="text-3xl font-bold text-yellow-600" id="stat-pending">0</p>
+                </div>
+                <div class="bg-white rounded-lg shadow-md p-6 text-center">
+                    <h3 class="text-sm font-medium text-gray-500 mb-2">Confirmed</h3>
+                    <p class="text-3xl font-bold text-green-600" id="stat-confirmed">0</p>
+                </div>
+                <div class="bg-white rounded-lg shadow-md p-6 text-center">
+                    <h3 class="text-sm font-medium text-gray-500 mb-2">Total Users</h3>
+                    <p class="text-3xl font-bold text-purple-600" id="stat-users">0</p>
+                </div>
+            </div>
+
+            <!-- Tabs -->
+            <div class="mb-6 border-b border-gray-200">
+                <nav class="flex space-x-8">
+                    <button id="tab-bookings" class="tab-button border-b-2 border-blue-600 text-blue-600 py-4 px-1 text-sm font-medium">
+                        All Bookings
+                    </button>
+                    <button id="tab-calendar" class="tab-button border-b-2 border-transparent text-gray-500 hover:text-gray-700 py-4 px-1 text-sm font-medium">
+                        Calendar
+                    </button>
+                    <button id="tab-users" class="tab-button border-b-2 border-transparent text-gray-500 hover:text-gray-700 py-4 px-1 text-sm font-medium">
+                        Users
+                    </button>
+                    <button id="tab-form-builder" class="tab-button border-b-2 border-transparent text-gray-500 hover:text-gray-700 py-4 px-1 text-sm font-medium">
+                        Form Builder
+                    </button>
+                    <button id="tab-settings" class="tab-button border-b-2 border-transparent text-gray-500 hover:text-gray-700 py-4 px-1 text-sm font-medium">
+                        Settings
+                    </button>
+                    <button id="tab-analytics" class="tab-button border-b-2 border-transparent text-gray-500 hover:text-gray-700 py-4 px-1 text-sm font-medium">
+                        Analytics
+                    </button>
+                </nav>
+            </div>
+
+            <!-- Bookings Tab -->
+            <div id="content-bookings" class="tab-content">
+                <div class="mb-4 flex items-center justify-between">
+                    <div>
+                        <h2 class="text-2xl font-semibold">All Bookings</h2>
+                        <p class="text-sm text-gray-600 mt-1">Click on any booking card to view and edit details</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <select id="filter-status" class="px-4 py-2 border border-gray-300 rounded-lg">
+                            <option value="all">All Status</option>
+                            <option value="pending">Pending</option>
+                            <option value="confirmed">Confirmed</option>
+                            <option value="completed">Completed</option>
+                            <option value="cancelled">Cancelled</option>
+                        </select>
+                        <select id="filter-property" class="px-4 py-2 border border-gray-300 rounded-lg">
+                            <option value="all">All Types</option>
+                            <option value="residential">Residential</option>
+                            <option value="commercial">Commercial</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="all-bookings-list" class="space-y-4">
+                    <!-- Bookings will be loaded here -->
+                </div>
+            </div>
+
+            <!-- Calendar Tab -->
+            <div id="content-calendar" class="tab-content hidden">
+                <h2 class="text-2xl font-semibold mb-4">Booking Calendar</h2>
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div id="admin-calendar-container"></div>
+                </div>
+            </div>
+
+            <!-- Users Tab -->
+            <div id="content-users" class="tab-content hidden">
+                <div class="mb-4 flex items-center justify-between">
+                    <h2 class="text-2xl font-semibold">All Users</h2>
+                </div>
+                <div id="users-list" class="space-y-4">
+                    <!-- Users will be loaded here -->
+                </div>
+            </div>
+
+            <!-- Form Builder Tab -->
+            <div id="content-form-builder" class="tab-content hidden">
+                <div class="mb-4 flex items-center justify-between">
+                    <div>
+                        <h2 class="text-2xl font-semibold">Form Builder</h2>
+                        <p class="text-sm text-gray-600 mt-1">Customize booking form fields, labels, and options</p>
+                    </div>
+                    <button id="reset-form-config" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition">
+                        Reset to Default
+                    </button>
+                </div>
+
+                <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                    <h3 class="text-lg font-semibold mb-4">Field Labels</h3>
+                    <div id="field-labels-editor" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- Field labels will be loaded here -->
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                    <h3 class="text-lg font-semibold mb-4">Complexity Options</h3>
+                    <div id="complexity-editor">
+                        <!-- Complexity options will be loaded here -->
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                    <h3 class="text-lg font-semibold mb-4">Home Size Options (Residential)</h3>
+                    <div id="homeSize-editor">
+                        <!-- Home size options will be loaded here -->
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                    <h3 class="text-lg font-semibold mb-4">Office Type Options (Commercial)</h3>
+                    <div id="officeType-editor">
+                        <!-- Office type options will be loaded here -->
+                    </div>
+                </div>
+
+                <div class="flex gap-4">
+                    <button id="save-form-config" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-semibold">
+                        Save Changes
+                    </button>
+                    <button id="preview-form" class="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold">
+                        Preview Form
+                    </button>
+                </div>
+            </div>
+
+            <!-- Settings Tab -->
+            <div id="content-settings" class="tab-content hidden">
+                <h2 class="text-2xl font-semibold mb-4">Settings</h2>
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-lg font-semibold mb-4">Navigation Settings</h3>
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <label for="toggle-membership" class="text-gray-700 font-medium">
+                                Show Membership Link
+                            </label>
+                            <p class="text-sm text-gray-500 mt-1">
+                                Toggle the visibility of the membership link in the navigation bar
+                            </p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="toggle-membership" class="sr-only peer">
+                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                        </label>
+                    </div>
+                    <button id="save-settings" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-semibold">
+                        Save Settings
+                    </button>
+                </div>
+            </div>
+
+            <!-- Analytics Tab -->
+            <div id="content-analytics" class="tab-content hidden">
+                <h2 class="text-2xl font-semibold mb-4">Analytics</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <h3 class="text-lg font-semibold mb-4">Bookings by Status</h3>
+                        <div id="status-chart" class="space-y-2">
+                            <!-- Status breakdown will be loaded here -->
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <h3 class="text-lg font-semibold mb-4">Bookings by Type</h3>
+                        <div id="type-chart" class="space-y-2">
+                            <!-- Type breakdown will be loaded here -->
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <h3 class="text-lg font-semibold mb-4">User Statistics</h3>
+                        <div id="user-stats" class="space-y-2">
+                            <!-- User stats will be loaded here -->
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <h3 class="text-lg font-semibold mb-4">Recent Signups</h3>
+                        <div id="recent-signups" class="space-y-2">
+                            <!-- Recent signups will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Booking Modal -->
+    <div id="booking-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-2xl font-bold" id="modal-title">Booking Details</h3>
+                    <button id="close-modal" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+                </div>
+                <div id="modal-content">
+                    <!-- Modal content will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- User Modal -->
+    <div id="user-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-2xl font-bold">User Details</h3>
+                    <button id="close-user-modal" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+                </div>
+                <div id="user-modal-content">
+                    <!-- User modal content will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900 text-white mt-20">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-8 items-start">
+                <div>
+                    <h3 class="text-xl font-bold mb-4">Clean To The Mack's</h3>
+                    <p class="text-gray-400 leading-relaxed">
+                        Professional cleaning services for your home or office.
+                    </p>
+                </div>
+                
+                <div>
+                    <h4 class="font-semibold mb-4 text-white">Services</h4>
+                    <ul class="space-y-2 text-gray-400">
+                        <li><a href="book-deep-clean.html" class="hover:text-white transition">Deep Clean</a></li>
+                        <li><a href="our-work.html" class="hover:text-white transition">Our Work</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h4 class="font-semibold mb-4 text-white">Company</h4>
+                    <ul class="space-y-2 text-gray-400">
+                        <li><a href="index.html" class="hover:text-white transition">About Us</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h4 class="font-semibold mb-4 text-white">Account</h4>
+                    <ul class="space-y-2 text-gray-400">
+                        <li><a href="signin.html" class="hover:text-white transition">Sign In</a></li>
+                        <li><a href="dashboard.html" class="hover:text-white transition">Dashboard</a></li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
+                <p>&copy; <script>document.write(new Date().getFullYear())</script> Clean To The Mack's. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="js/auth.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/calendar.js"></script>
+    <script src="js/main.js"></script>
+    <script src="js/admin-dashboard.js"></script>
+</body>
+</html>
+

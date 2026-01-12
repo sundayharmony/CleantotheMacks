@@ -1,0 +1,29 @@
+/* Custom styles for Clean To The Mack's */
+.logo-text {
+  font-family: 'Brush Script MT', 'Lucida Handwriting', cursive, serif;
+  text-shadow: 2px 2px 4px rgba(30, 64, 175, 0.3);
+}
+
+/* Smooth transitions */
+* {
+  transition: all 0.3s ease;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #2563eb;
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #1e40af;
+}
+
