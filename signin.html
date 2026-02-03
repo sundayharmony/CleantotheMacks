@@ -224,11 +224,53 @@
     <script src="js/utils.js"></script>
     <script src="js/main.js"></script>
     <script>
+        // Toggle between sign in and sign up tabs
+        const signinTab = document.getElementById('signin-tab');
+        const signupTab = document.getElementById('signup-tab');
+        const signinForm = document.getElementById('signin-form');
+        const signupForm = document.getElementById('signup-form');
+        const pageTitle = document.getElementById('page-title');
+        const errorMessage = document.getElementById('error-message');
+
+        function showSignin() {
+            if (pageTitle) pageTitle.textContent = 'Sign In';
+            if (signinForm) signinForm.style.display = 'block';
+            if (signupForm) signupForm.style.display = 'none';
+            if (errorMessage) errorMessage.classList.add('hidden');
+
+            if (signinTab) {
+                signinTab.classList.add('border-b-2', 'border-blue-600', 'text-blue-600');
+                signinTab.classList.remove('text-gray-600');
+            }
+            if (signupTab) {
+                signupTab.classList.remove('border-b-2', 'border-blue-600', 'text-blue-600');
+                signupTab.classList.add('text-gray-600');
+            }
+        }
+
+        function showSignup() {
+            if (pageTitle) pageTitle.textContent = 'Sign Up';
+            if (signinForm) signinForm.style.display = 'none';
+            if (signupForm) signupForm.style.display = 'block';
+            if (errorMessage) errorMessage.classList.add('hidden');
+
+            if (signupTab) {
+                signupTab.classList.add('border-b-2', 'border-blue-600', 'text-blue-600');
+                signupTab.classList.remove('text-gray-600');
+            }
+            if (signinTab) {
+                signinTab.classList.remove('border-b-2', 'border-blue-600', 'text-blue-600');
+                signinTab.classList.add('text-gray-600');
+            }
+        }
+
+        signinTab?.addEventListener('click', showSignin);
+        signupTab?.addEventListener('click', showSignup);
+
         // Handle sign in form submission
         document.getElementById('signin-form')?.addEventListener('submit', async function(e) {
             e.preventDefault();
             
-            const errorMessage = document.getElementById('error-message');
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
             
@@ -258,7 +300,6 @@
         document.getElementById('signup-form')?.addEventListener('submit', async function(e) {
             e.preventDefault();
             
-            const errorMessage = document.getElementById('error-message');
             const name = document.getElementById('name-signup').value;
             const email = document.getElementById('email-signup').value;
             const password = document.getElementById('password-signup').value;
