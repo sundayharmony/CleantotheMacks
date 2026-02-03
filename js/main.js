@@ -26,18 +26,9 @@ async function updateNavbar() {
     const isAuth = await safeIsAuthenticated();
     const currentUser = await safeGetCurrentUser();
     
-    // Get navigation settings
-    const navSettings = typeof getNavigationSettings === 'function' ? getNavigationSettings() : { showMembership: false };
-    
     // Update desktop nav
     const desktopNav = document.querySelector('[data-desktop-nav]');
     if (desktopNav) {
-      // Show/hide membership link based on settings
-      const membershipLink = desktopNav.querySelector('a[href="membership.html"]');
-      if (membershipLink) {
-        membershipLink.style.display = navSettings.showMembership ? '' : 'none';
-      }
-      
       // Remove any existing dynamic elements
       const existingDropdown = desktopNav.querySelector('.user-dropdown-container');
       const existingSignIn = desktopNav.querySelector('a[href="signin.html"]');
@@ -182,12 +173,6 @@ async function updateNavbar() {
     if (mobileNav) {
       const mobileContainer = mobileNav.querySelector('.flex.flex-col.space-y-4');
       if (mobileContainer) {
-        // Show/hide membership link based on settings
-        const mobileMembershipLink = mobileContainer.querySelector('a[href="membership.html"]');
-        if (mobileMembershipLink) {
-          mobileMembershipLink.style.display = navSettings.showMembership ? '' : 'none';
-        }
-        
         // Remove any existing dynamic elements
         const existingMobileDropdown = mobileContainer.querySelector('.mobile-user-dropdown-container');
         const existingMobileSignIn = mobileContainer.querySelector('a[href="signin.html"]');
