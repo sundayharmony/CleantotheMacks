@@ -439,7 +439,7 @@ function loadFormConfiguration() {
 }
 
 // Property type toggle for booking form
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
   // Property type toggle
   const propertyTypeRadios = document.querySelectorAll('input[name="propertyType"]');
   const residentialFields = document.getElementById('residential-fields');
