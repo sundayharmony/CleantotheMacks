@@ -1,17 +1,17 @@
 // Dashboard functionality
 
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
   // Load utility functions if available
   if (typeof sanitizeForDisplay === 'undefined') {
     console.warn('utils.js not loaded. Some features may not work correctly.');
   }
   // Check authentication
-  if (!isAuthenticated()) {
+  if (!await isAuthenticated()) {
     window.location.href = 'signin.html';
     return;
   }
 
-  const currentUser = getCurrentUser();
+  const currentUser = await getCurrentUser();
   if (!currentUser) {
     window.location.href = 'signin.html';
     return;
@@ -34,7 +34,7 @@ document.addEventListener('DOMContentLoaded', function() {
   renderCalendar(today.getFullYear(), today.getMonth(), 'calendar-container', handleDateClick, handleBookingClick);
 
   // Load and display bookings
-  loadBookings();
+  await loadBookings();
 
   // Modal handlers
   const modal = document.getElementById('booking-modal');
@@ -66,8 +66,8 @@ function handleDateClick(year, month, day) {
 }
 
 // Handle booking click - view/edit/delete
-function handleBookingClick(bookingId) {
-  const booking = getBookingById(bookingId);
+async function handleBookingClick(bookingId) {
+  const booking = await getBookingById(bookingId);
   if (!booking) return;
 
   const modal = document.getElementById('booking-modal');
@@ -229,11 +229,11 @@ function handleBookingClick(bookingId) {
 }
 
 // Load and display user's bookings
-function loadBookings() {
-  const currentUser = getCurrentUser();
+async function loadBookings() {
+  const currentUser = await getCurrentUser();
   if (!currentUser) return;
 
-  const bookings = getUserBookings(currentUser.id);
+  const bookings = await getUserBookings(currentUser.id);
   const bookingsList = document.getElementById('bookings-list');
 
   if (!bookingsList) return;
@@ -322,13 +322,13 @@ function loadBookings() {
 }
 
 // Update booking status
-function updateBookingStatus(bookingId, status) {
-  updateBooking(bookingId, { status: status });
+async function updateBookingStatus(bookingId, status) {
+  await updateBooking(bookingId, { status: status });
   
   // Reload calendar and bookings
   const today = new Date();
   renderCalendar(today.getFullYear(), today.getMonth(), 'calendar-container', handleDateClick, handleBookingClick);
-  loadBookings();
+  await loadBookings();
   
   // Close modal
   const modal = document.getElementById('booking-modal');
@@ -336,14 +336,14 @@ function updateBookingStatus(bookingId, status) {
 }
 
 // Delete booking
-function deleteBookingById(bookingId) {
+async function deleteBookingById(bookingId) {
   if (confirm('Are you sure you want to delete this booking?')) {
-    deleteBooking(bookingId);
+    await deleteBooking(bookingId);
     
     // Reload calendar and bookings
     const today = new Date();
     renderCalendar(today.getFullYear(), today.getMonth(), 'calendar-container', handleDateClick, handleBookingClick);
-    loadBookings();
+    await loadBookings();
     
     // Close modal
     const modal = document.getElementById('booking-modal');

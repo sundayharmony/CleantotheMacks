@@ -218,6 +218,8 @@
         </div>
     </footer>
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/supabase.js"></script>
     <script src="js/auth.js"></script>
     <script src="js/utils.js"></script>
     <script src="js/main.js"></script>
@@ -237,9 +239,8 @@
             
             try {
                 const user = await authenticateUser(email, password);
-                setCurrentUser(user.id);
                 
-                // Redirect based on role (admin@example.com automatically gets admin role)
+                // Redirect based on role
                 if (user.role === 'admin') {
                     window.location.href = 'admin-dashboard.html';
                 } else {
@@ -287,9 +288,16 @@
             }
             
             try {
-                const user = await createUser(name, email, password);
-                setCurrentUser(user.id);
-                window.location.href = 'dashboard.html';
+                await createUser(name, email, password);
+                if (errorMessage) {
+                    errorMessage.textContent = 'Account created. Please check your email to confirm, then sign in.';
+                    errorMessage.classList.remove('hidden');
+                    errorMessage.classList.remove('bg-red-100', 'text-red-800');
+                    errorMessage.classList.add('bg-green-100', 'text-green-800');
+                }
+                setTimeout(() => {
+                    window.location.href = 'signin.html';
+                }, 2000);
             } catch (error) {
                 if (errorMessage) {
                     errorMessage.textContent = error.message;

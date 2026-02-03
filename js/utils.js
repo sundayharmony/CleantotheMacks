@@ -77,17 +77,17 @@ function functionExists(funcName) {
 }
 
 // Safe get current user
-function safeGetCurrentUser() {
+async function safeGetCurrentUser() {
   if (functionExists('getCurrentUser')) {
-    return getCurrentUser();
+    return await getCurrentUser();
   }
   return null;
 }
 
 // Safe check authentication
-function safeIsAuthenticated() {
+async function safeIsAuthenticated() {
   if (functionExists('isAuthenticated')) {
-    return isAuthenticated();
+    return await isAuthenticated();
   }
   return false;
 }

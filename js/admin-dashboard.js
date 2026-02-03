@@ -3,14 +3,14 @@
 let currentFilterStatus = 'all';
 let currentFilterProperty = 'all';
 
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
   // Check admin authentication
-  if (!isAuthenticated() || !isCurrentUserAdmin()) {
+  if (!await isAuthenticated() || !await isCurrentUserAdmin()) {
     window.location.href = 'signin.html';
     return;
   }
 
-  const currentUser = getCurrentUser();
+  const currentUser = await getCurrentUser();
   if (!currentUser) {
     window.location.href = 'signin.html';
     return;
@@ -23,7 +23,7 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   // Load statistics
-  loadStatistics();
+  await loadStatistics();
 
   // Initialize tabs
   initializeTabs();
@@ -48,7 +48,7 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   // Load initial content
-  loadAllBookings();
+  await loadAllBookings();
 
   // Initialize filters
   const statusFilter = document.getElementById('filter-status');
@@ -164,9 +164,9 @@ function initializeTabs() {
 }
 
 // Load statistics
-function loadStatistics() {
-  const stats = getBookingStats();
-  const userStats = getUserStats();
+async function loadStatistics() {
+  const stats = await getBookingStats();
+  const userStats = await getUserStats();
 
   document.getElementById('stat-total').textContent = stats.total;
   document.getElementById('stat-pending').textContent = stats.pending;
@@ -175,8 +175,8 @@ function loadStatistics() {
 }
 
 // Load all bookings with filters
-function loadAllBookings() {
-  let bookings = getAllBookings();
+async function loadAllBookings() {
+  let bookings = await getAllBookings();
 
   // Apply filters
   if (currentFilterStatus !== 'all') {
@@ -263,8 +263,8 @@ function handleAdminDateClick(year, month, day) {
 }
 
 // Handle admin booking click - show editable form
-function handleAdminBookingClick(bookingId) {
-  const booking = getBookingById(bookingId);
+async function handleAdminBookingClick(bookingId) {
+  const booking = await getBookingById(bookingId);
   if (!booking) return;
 
   const modal = document.getElementById('booking-modal');
@@ -495,7 +495,7 @@ function handleAdminBookingClick(bookingId) {
 }
 
 // Save booking changes
-function saveBookingChanges(bookingId) {
+async function saveBookingChanges(bookingId) {
   const errorMessage = document.getElementById('edit-error-message');
   if (errorMessage) {
     errorMessage.classList.add('hidden');
@@ -582,11 +582,11 @@ function saveBookingChanges(bookingId) {
 
   // Update booking
   try {
-    updateBooking(bookingId, updates);
+    await updateBooking(bookingId, updates);
     
     // Reload data
-    loadStatistics();
-    loadAllBookings();
+    await loadStatistics();
+    await loadAllBookings();
     
     // Reload calendar if visible
     const calendarTab = document.getElementById('content-calendar');
@@ -609,12 +609,12 @@ function saveBookingChanges(bookingId) {
 }
 
 // Update admin booking status (kept for backward compatibility)
-function updateAdminBookingStatus(bookingId, status) {
-  updateBooking(bookingId, { status: status });
+async function updateAdminBookingStatus(bookingId, status) {
+  await updateBooking(bookingId, { status: status });
   
   // Reload data
-  loadStatistics();
-  loadAllBookings();
+  await loadStatistics();
+  await loadAllBookings();
   
   // Reload calendar if visible
   const calendarTab = document.getElementById('content-calendar');
@@ -629,13 +629,13 @@ function updateAdminBookingStatus(bookingId, status) {
 }
 
 // Delete admin booking
-function deleteAdminBooking(bookingId) {
+async function deleteAdminBooking(bookingId) {
   if (confirm('Are you sure you want to delete this booking?')) {
-    deleteBooking(bookingId);
+    await deleteBooking(bookingId);
     
     // Reload data
-    loadStatistics();
-    loadAllBookings();
+    await loadStatistics();
+    await loadAllBookings();
     
     // Reload calendar if visible
     const calendarTab = document.getElementById('content-calendar');
@@ -651,8 +651,15 @@ function deleteAdminBooking(bookingId) {
 }
 
 // Load all users
-function loadAllUsers() {
-  const users = getAllUsers();
+async function loadAllUsers() {
+  const users = await getAllUsers();
+  const bookings = await getAllBookings();
+  const bookingsByUser = bookings.reduce((acc, booking) => {
+    const key = booking.userId;
+    if (!key) return acc;
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
   const usersList = document.getElementById('users-list');
 
   if (!usersList) return;
@@ -671,7 +678,7 @@ function loadAllUsers() {
 
   let html = '';
   users.forEach(user => {
-    const userBookings = getUserBookings(user.id);
+    const bookingCount = bookingsByUser[user.id] || 0;
     const userName = sanitizeForDisplay(user.name || 'N/A');
     const userEmail = sanitizeForDisplay(user.email);
     const roleBadge = user.role === 'admin' 
@@ -689,7 +696,7 @@ function loadAllUsers() {
           <div class="flex gap-2">
             ${roleBadge}
             <span class="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm font-semibold">
-              ${userBookings.length} Booking${userBookings.length !== 1 ? 's' : ''}
+              ${bookingCount} Booking${bookingCount !== 1 ? 's' : ''}
             </span>
           </div>
         </div>
@@ -718,9 +725,10 @@ function loadAllUsers() {
 }
 
 // View user bookings
-function viewUserBookings(userId) {
-  const bookings = getUserBookings(userId);
-  const user = getAllUsers().find(u => u.id === userId);
+async function viewUserBookings(userId) {
+  const bookings = await getUserBookings(userId);
+  const users = await getAllUsers();
+  const user = users.find(u => u.id === userId);
   
   if (!user) return;
 
@@ -771,11 +779,11 @@ function viewUserBookings(userId) {
 }
 
 // Promote user to admin
-function promoteToAdmin(userId) {
+async function promoteToAdmin(userId) {
   if (confirm('Are you sure you want to promote this user to admin?')) {
     try {
-      updateUserRole(userId, 'admin');
-      loadAllUsers();
+      await updateUserRole(userId, 'admin');
+      await loadAllUsers();
       alert('User promoted to admin successfully!');
     } catch (error) {
       alert('Error: ' + error.message);
@@ -784,15 +792,16 @@ function promoteToAdmin(userId) {
 }
 
 // Delete admin user
-function deleteAdminUser(userId) {
-  const user = getAllUsers().find(u => u.id === userId);
+async function deleteAdminUser(userId) {
+  const users = await getAllUsers();
+  const user = users.find(u => u.id === userId);
   if (!user) return;
 
   if (confirm(`Are you sure you want to delete user "${user.name || user.email}"? This will also delete all their bookings.`)) {
     try {
-      deleteUser(userId);
-      loadStatistics();
-      loadAllUsers();
+      await deleteUser(userId);
+      await loadStatistics();
+      await loadAllUsers();
       alert('User deleted successfully!');
     } catch (error) {
       alert('Error: ' + error.message);
@@ -801,10 +810,10 @@ function deleteAdminUser(userId) {
 }
 
 // Load analytics
-function loadAnalytics() {
-  const stats = getBookingStats();
-  const userStats = getUserStats();
-  const signups = getSignups();
+async function loadAnalytics() {
+  const stats = await getBookingStats();
+  const userStats = await getUserStats();
+  const users = await getAllUsers();
 
   // Status chart
   const statusChart = document.getElementById('status-chart');
@@ -874,17 +883,20 @@ function loadAnalytics() {
   // Recent signups
   const recentSignups = document.getElementById('recent-signups');
   if (recentSignups) {
-    const recent = signups.slice(-5).reverse();
+    const recent = users
+      .filter(user => user.createdAt)
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .slice(0, 5);
+
     if (recent.length === 0) {
       recentSignups.innerHTML = '<p class="text-gray-600">No recent signups.</p>';
     } else {
       let html = '';
-      recent.forEach(signup => {
-        const user = getAllUsers().find(u => u.id === signup.userId);
+      recent.forEach(user => {
         html += `
           <div class="text-sm">
-            <p class="font-semibold">${sanitizeForDisplay(user ? (user.name || user.email) : signup.email)}</p>
-            <p class="text-gray-500">${formatDate(signup.timestamp)}</p>
+            <p class="font-semibold">${sanitizeForDisplay(user.name || user.email)}</p>
+            <p class="text-gray-500">${formatDate(user.createdAt)}</p>
           </div>
         `;
       });

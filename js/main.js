@@ -21,10 +21,10 @@ function generateDropdownContent(userRole) {
 }
 
 // Update navbar based on auth state
-function updateNavbar() {
+async function updateNavbar() {
   try {
-    const isAuth = safeIsAuthenticated();
-    const currentUser = safeGetCurrentUser();
+    const isAuth = await safeIsAuthenticated();
+    const currentUser = await safeGetCurrentUser();
     
     // Get navigation settings
     const navSettings = typeof getNavigationSettings === 'function' ? getNavigationSettings() : { showMembership: false };
@@ -102,10 +102,10 @@ function updateNavbar() {
         // Handle sign out
         const signOutLink = dropdownMenu.querySelector('.sign-out-link');
         if (signOutLink) {
-          signOutLink.addEventListener('click', function(e) {
+          signOutLink.addEventListener('click', async function(e) {
             e.preventDefault();
             if (functionExists('signOut')) {
-              signOut();
+              await signOut();
               window.location.href = 'index.html';
             }
           });
@@ -230,10 +230,10 @@ function updateNavbar() {
           
           const mobileSignOutLink = mobileDropdownMenu.querySelector('.mobile-sign-out-link');
           if (mobileSignOutLink) {
-            mobileSignOutLink.addEventListener('click', function(e) {
+            mobileSignOutLink.addEventListener('click', async function(e) {
               e.preventDefault();
               if (functionExists('signOut')) {
-                signOut();
+                await signOut();
                 window.location.href = 'index.html';
               }
             });
@@ -279,7 +279,7 @@ function updateNavbar() {
 }
 
 // Mobile menu toggle
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
   // Update navbar on page load
   updateNavbar();
   
@@ -480,7 +480,7 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   // Auto-fill form if user is logged in
-  const currentUser = safeGetCurrentUser();
+  const currentUser = await safeGetCurrentUser();
   if (currentUser) {
     const nameField = document.getElementById('name');
     const emailField = document.getElementById('email');
@@ -504,7 +504,7 @@ document.addEventListener('DOMContentLoaded', function() {
   // Form handling
   const intakeForm = document.getElementById('intake-form');
   if (intakeForm) {
-    intakeForm.addEventListener('submit', function(e) {
+    intakeForm.addEventListener('submit', async function(e) {
       e.preventDefault();
       
       // Hide error message if shown
@@ -516,7 +516,7 @@ document.addEventListener('DOMContentLoaded', function() {
       // Get form data
       const formData = new FormData(this);
       const propertyType = formData.get('propertyType');
-      const currentUser = safeGetCurrentUser();
+      const currentUser = await safeGetCurrentUser();
       
       // Validate required fields
       if (!propertyType) {
@@ -527,8 +527,19 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
       }
       
+      if (!currentUser) {
+        if (errorMessage) {
+          errorMessage.textContent = 'Please sign in to submit a booking.';
+          errorMessage.classList.remove('hidden');
+        }
+        setTimeout(() => {
+          window.location.href = 'signin.html';
+        }, 1500);
+        return;
+      }
+
       const bookingData = {
-        userId: currentUser ? currentUser.id : null,
+        userId: currentUser.id,
         propertyType: propertyType,
         name: sanitizeForDisplay(formData.get('name')?.trim() || ''),
         email: sanitizeForDisplay(formData.get('email')?.trim() || ''),
@@ -578,7 +589,7 @@ document.addEventListener('DOMContentLoaded', function() {
       // Create booking
       if (functionExists('createBooking')) {
         try {
-          createBooking(bookingData);
+          await createBooking(bookingData);
           
           // Show success message
           if (errorMessage) {
@@ -590,15 +601,9 @@ document.addEventListener('DOMContentLoaded', function() {
           }
           
           // Redirect or show message
-          if (currentUser) {
-            setTimeout(() => {
-              window.location.href = 'dashboard.html';
-            }, 1500);
-          } else {
-            setTimeout(() => {
-              window.location.href = 'signin.html';
-            }, 2000);
-          }
+          setTimeout(() => {
+            window.location.href = 'dashboard.html';
+          }, 1500);
         } catch (error) {
           console.error('Error creating booking:', error.message || 'Unknown error');
           if (errorMessage) {

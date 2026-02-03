@@ -1,356 +1,361 @@
-// Authentication utility module for localStorage-based auth
+// Authentication + data access using Supabase
 
-// Constants
-const ADMIN_EMAIL = 'admin@example.com';
-
-// Simple hash function (for demo purposes - not cryptographically secure)
-async function hashPassword(password) {
-  // Use Web Crypto API if available, otherwise simple hash
-  if (window.crypto && window.crypto.subtle) {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(password);
-    const hashBuffer = await window.crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-  } else {
-    // Fallback simple hash (not secure, but works for demo)
-    let hash = 0;
-    for (let i = 0; i < password.length; i++) {
-      const char = password.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash; // Convert to 32-bit integer
-    }
-    return Math.abs(hash).toString(16);
-  }
+function mapBookingFromDb(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    userId: row.user_id,
+    status: row.status,
+    propertyType: row.property_type,
+    name: row.name,
+    email: row.email,
+    phone: row.phone,
+    address: row.address,
+    complexity: row.complexity,
+    homeSize: row.home_size,
+    bedrooms: row.bedrooms,
+    bathrooms: row.bathrooms,
+    squareFootage: row.square_footage,
+    businessName: row.business_name,
+    officeType: row.office_type,
+    numberOfFloors: row.number_of_floors,
+    numberOfEmployees: row.number_of_employees,
+    preferredDate: row.preferred_date,
+    additionalInfo: row.additional_info,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
 }
 
-// Generate unique ID
-function generateId() {
-  return Date.now().toString(36) + Math.random().toString(36).substring(2);
+function mapBookingToDb(bookingData, userId) {
+  return {
+    user_id: userId,
+    status: bookingData.status || 'pending',
+    property_type: bookingData.propertyType,
+    name: bookingData.name || null,
+    email: bookingData.email || null,
+    phone: bookingData.phone || null,
+    address: bookingData.address || null,
+    complexity: bookingData.complexity || null,
+    home_size: bookingData.homeSize || null,
+    bedrooms: bookingData.bedrooms ?? null,
+    bathrooms: bookingData.bathrooms ?? null,
+    square_footage: bookingData.squareFootage ?? null,
+    business_name: bookingData.businessName || null,
+    office_type: bookingData.officeType || null,
+    number_of_floors: bookingData.numberOfFloors ?? null,
+    number_of_employees: bookingData.numberOfEmployees ?? null,
+    preferred_date: bookingData.preferredDate || null,
+    additional_info: bookingData.additionalInfo || null
+  };
 }
 
-// Get users from localStorage
-function getUsers() {
-  const usersJson = localStorage.getItem('cttm_users');
-  if (!usersJson) return [];
-  try {
-    return JSON.parse(usersJson);
-  } catch (e) {
-    console.error('Error parsing users from localStorage:', e);
-    return [];
-  }
+function mapBookingUpdatesToDb(updates) {
+  const mapped = {};
+  if (updates.status !== undefined) mapped.status = updates.status;
+  if (updates.propertyType !== undefined) mapped.property_type = updates.propertyType;
+  if (updates.name !== undefined) mapped.name = updates.name;
+  if (updates.email !== undefined) mapped.email = updates.email;
+  if (updates.phone !== undefined) mapped.phone = updates.phone;
+  if (updates.address !== undefined) mapped.address = updates.address;
+  if (updates.complexity !== undefined) mapped.complexity = updates.complexity;
+  if (updates.homeSize !== undefined) mapped.home_size = updates.homeSize;
+  if (updates.bedrooms !== undefined) mapped.bedrooms = updates.bedrooms;
+  if (updates.bathrooms !== undefined) mapped.bathrooms = updates.bathrooms;
+  if (updates.squareFootage !== undefined) mapped.square_footage = updates.squareFootage;
+  if (updates.businessName !== undefined) mapped.business_name = updates.businessName;
+  if (updates.officeType !== undefined) mapped.office_type = updates.officeType;
+  if (updates.numberOfFloors !== undefined) mapped.number_of_floors = updates.numberOfFloors;
+  if (updates.numberOfEmployees !== undefined) mapped.number_of_employees = updates.numberOfEmployees;
+  if (updates.preferredDate !== undefined) mapped.preferred_date = updates.preferredDate;
+  if (updates.additionalInfo !== undefined) mapped.additional_info = updates.additionalInfo;
+  return mapped;
 }
 
-// Save users to localStorage
-function saveUsers(users) {
-  try {
-    localStorage.setItem('cttm_users', JSON.stringify(users));
-  } catch (e) {
-    console.error('Error saving users to localStorage:', e);
-    throw new Error('Unable to save data. Please clear some space and try again.');
+async function getProfile(userId) {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, role, name, email, created_at')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Error loading profile:', error.message || 'Unknown error');
+    return null;
   }
+  return data || null;
 }
 
-// Get bookings from localStorage
-function getBookings() {
-  const bookingsJson = localStorage.getItem('cttm_bookings');
-  if (!bookingsJson) return [];
-  try {
-    return JSON.parse(bookingsJson);
-  } catch (e) {
-    console.error('Error parsing bookings from localStorage:', e);
-    return [];
-  }
-}
+async function ensureProfile(user, roleOverride = null, nameOverride = null) {
+  if (!user) return null;
+  const supabase = getSupabaseClient();
+  const profile = {
+    id: user.id,
+    email: user.email,
+    name: nameOverride || user.user_metadata?.name || null,
+    role: roleOverride || 'user'
+  };
 
-// Save bookings to localStorage
-function saveBookings(bookings) {
-  try {
-    localStorage.setItem('cttm_bookings', JSON.stringify(bookings));
-  } catch (e) {
-    console.error('Error saving bookings to localStorage:', e);
-    throw new Error('Unable to save booking. Please clear some space and try again.');
-  }
-}
+  const { data, error } = await supabase
+    .from('profiles')
+    .upsert(profile, { onConflict: 'id' })
+    .select('id, role, name, email, created_at')
+    .single();
 
-// Get signups from localStorage
-function getSignups() {
-  const signupsJson = localStorage.getItem('cttm_userSignups');
-  if (!signupsJson) return [];
-  try {
-    return JSON.parse(signupsJson);
-  } catch (e) {
-    console.error('Error parsing signups from localStorage:', e);
-    return [];
+  if (error) {
+    console.error('Error saving profile:', error.message || 'Unknown error');
+    return null;
   }
-}
-
-// Save signups to localStorage
-function saveSignups(signups) {
-  try {
-    localStorage.setItem('cttm_userSignups', JSON.stringify(signups));
-  } catch (e) {
-    console.error('Error saving signups to localStorage:', e);
-    // Non-critical, don't throw
-  }
+  return data;
 }
 
 // Create a new user
 async function createUser(name, email, password, role = null) {
-  const users = getUsers();
-  
-  // Check if user already exists (case-insensitive)
-  if (users.find(u => u.email.toLowerCase() === email.toLowerCase())) {
-    throw new Error('User with this email already exists');
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: { data: { name } }
+  });
+
+  if (error) {
+    throw new Error(error.message || 'Unable to create account');
   }
-  
-  // Automatically set admin role for admin@example.com
-  let userRole = role;
-  if (!userRole) {
-    userRole = (email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) ? 'admin' : 'user';
+
+  if (data?.user) {
+    await ensureProfile(data.user, role || 'user', name);
   }
-  
-  // Validate role
-  if (userRole !== 'user' && userRole !== 'admin') {
-    throw new Error('Invalid role. Must be "user" or "admin"');
-  }
-  
-  // Hash password
-  const hashedPassword = await hashPassword(password);
-  
-  // Create user object
-  const user = {
-    id: generateId(),
+
+  return {
+    id: data?.user?.id || null,
     name: name,
     email: email,
-    password: hashedPassword,
-    role: userRole,
-    createdAt: new Date().toISOString()
+    role: role || 'user'
   };
-  
-  // Add to users array
-  users.push(user);
-  saveUsers(users);
-  
-  // Track signup
-  trackSignup(user.id, email);
-  
-  return user;
-}
-
-// Ensure admin@example.com has admin role
-function ensureAdminUser() {
-  const users = getUsers();
-  const adminUser = users.find(u => u.email.toLowerCase() === ADMIN_EMAIL.toLowerCase());
-  
-  // If admin user exists but doesn't have admin role, update it
-  if (adminUser && adminUser.role !== 'admin') {
-    adminUser.role = 'admin';
-    const userIndex = users.findIndex(u => u.id === adminUser.id);
-    if (userIndex !== -1) {
-      users[userIndex].role = 'admin';
-      saveUsers(users);
-    }
-  }
-}
-
-// Initialize admin user when script loads
-if (typeof window !== 'undefined') {
-  // Use DOMContentLoaded to ensure localStorage is available
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', ensureAdminUser);
-  } else {
-    ensureAdminUser();
-  }
 }
 
 // Authenticate user
 async function authenticateUser(email, password) {
-  const users = getUsers();
-  const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
-  
-  if (!user) {
-    throw new Error('Invalid email or password');
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error || !data?.user) {
+    throw new Error(error?.message || 'Invalid email or password');
   }
-  
-  // Hash provided password and compare
-  const hashedPassword = await hashPassword(password);
-  
-  if (user.password !== hashedPassword) {
-    throw new Error('Invalid email or password');
+
+  let profile = await getProfile(data.user.id);
+  if (!profile) {
+    profile = await ensureProfile(data.user, 'user', data.user.user_metadata?.name || null);
   }
-  
-  // Ensure admin@example.com has admin role (in case it was created before this update)
-  if (user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase() && user.role !== 'admin') {
-    user.role = 'admin';
-    const allUsers = getUsers();
-    const userIndex = allUsers.findIndex(u => u.id === user.id);
-    if (userIndex !== -1) {
-      allUsers[userIndex].role = 'admin';
-      saveUsers(allUsers);
-    }
-  }
-  
-  return user;
+
+  return {
+    id: data.user.id,
+    name: profile?.name || data.user.user_metadata?.name || '',
+    email: data.user.email,
+    role: profile?.role || 'user',
+    createdAt: profile?.created_at || null
+  };
 }
 
 // Get current logged-in user
-function getCurrentUser() {
-  // Ensure admin user has correct role
-  ensureAdminUser();
-  
-  const userId = localStorage.getItem('cttm_currentUser');
-  if (!userId) return null;
-  
-  const users = getUsers();
-  const user = users.find(u => u.id === userId) || null;
-  
-  // Double-check admin role for admin@example.com
-  if (user && user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase() && user.role !== 'admin') {
-    user.role = 'admin';
-    const userIndex = users.findIndex(u => u.id === userId);
-    if (userIndex !== -1) {
-      users[userIndex].role = 'admin';
-      saveUsers(users);
-    }
-  }
-  
-  return user;
+async function getCurrentUser() {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase.auth.getUser();
+  if (error || !data?.user) return null;
+
+  const profile = await getProfile(data.user.id);
+  return {
+    id: data.user.id,
+    name: profile?.name || data.user.user_metadata?.name || '',
+    email: data.user.email,
+    role: profile?.role || 'user',
+    createdAt: profile?.created_at || null
+  };
 }
 
-// Set current user (login)
-function setCurrentUser(userId) {
-  localStorage.setItem('cttm_currentUser', userId);
+// Set current user (kept for compatibility)
+function setCurrentUser() {
+  // Supabase manages session storage internally.
 }
 
 // Sign out
-function signOut() {
-  localStorage.removeItem('cttm_currentUser');
+async function signOut() {
+  const supabase = getSupabaseClient();
+  await supabase.auth.signOut();
 }
 
 // Check if user is authenticated
-function isAuthenticated() {
-  return getCurrentUser() !== null;
-}
-
-// Track user signup
-function trackSignup(userId, email) {
-  const signups = getSignups();
-  signups.push({
-    userId: userId,
-    email: email,
-    timestamp: new Date().toISOString()
-  });
-  saveSignups(signups);
+async function isAuthenticated() {
+  const user = await getCurrentUser();
+  return user !== null;
 }
 
 // Create a booking
-function createBooking(bookingData) {
-  const bookings = getBookings();
-  const booking = {
-    id: generateId(),
-    ...bookingData,
-    createdAt: new Date().toISOString()
-  };
-  bookings.push(booking);
-  saveBookings(bookings);
-  return booking;
+async function createBooking(bookingData) {
+  const supabase = getSupabaseClient();
+  const currentUser = await getCurrentUser();
+  const userId = bookingData.userId || currentUser?.id;
+  if (!userId) {
+    throw new Error('You must be signed in to create a booking.');
+  }
+
+  const payload = mapBookingToDb(bookingData, userId);
+  const { data, error } = await supabase
+    .from('bookings')
+    .insert(payload)
+    .select('*')
+    .single();
+
+  if (error) {
+    throw new Error(error.message || 'Unable to create booking');
+  }
+  return mapBookingFromDb(data);
 }
 
 // Get bookings for a user
-function getUserBookings(userId) {
-  const bookings = getBookings();
-  return bookings.filter(b => b.userId === userId);
+async function getUserBookings(userId) {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from('bookings')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error loading bookings:', error.message || 'Unknown error');
+    return [];
+  }
+  return (data || []).map(mapBookingFromDb);
 }
 
 // Get booking by ID
-function getBookingById(bookingId) {
-  const bookings = getBookings();
-  return bookings.find(b => b.id === bookingId);
+async function getBookingById(bookingId) {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from('bookings')
+    .select('*')
+    .eq('id', bookingId)
+    .single();
+
+  if (error) {
+    console.error('Error loading booking:', error.message || 'Unknown error');
+    return null;
+  }
+  return mapBookingFromDb(data);
 }
 
 // Update booking
-function updateBooking(bookingId, updates) {
-  const bookings = getBookings();
-  const index = bookings.findIndex(b => b.id === bookingId);
-  if (index !== -1) {
-    bookings[index] = { ...bookings[index], ...updates };
-    saveBookings(bookings);
-    return bookings[index];
+async function updateBooking(bookingId, updates) {
+  const supabase = getSupabaseClient();
+  const payload = mapBookingUpdatesToDb(updates);
+  const { data, error } = await supabase
+    .from('bookings')
+    .update(payload)
+    .eq('id', bookingId)
+    .select('*')
+    .single();
+
+  if (error) {
+    console.error('Error updating booking:', error.message || 'Unknown error');
+    return null;
   }
-  return null;
+  return mapBookingFromDb(data);
 }
 
 // Delete booking
-function deleteBooking(bookingId) {
-  const bookings = getBookings();
-  const filtered = bookings.filter(b => b.id !== bookingId);
-  saveBookings(filtered);
-  return filtered.length < bookings.length;
-}
+async function deleteBooking(bookingId) {
+  const supabase = getSupabaseClient();
+  const { error } = await supabase
+    .from('bookings')
+    .delete()
+    .eq('id', bookingId);
 
-// Check if user is admin
-function isAdmin(userId) {
-  const user = getUsers().find(u => u.id === userId);
-  return user && user.role === 'admin';
-}
-
-// Check if current user is admin
-function isCurrentUserAdmin() {
-  const currentUser = getCurrentUser();
-  return currentUser && currentUser.role === 'admin';
-}
-
-// Get all users
-function getAllUsers() {
-  return getUsers();
-}
-
-// Update user role
-function updateUserRole(userId, newRole) {
-  if (newRole !== 'user' && newRole !== 'admin') {
-    throw new Error('Invalid role. Must be "user" or "admin"');
+  if (error) {
+    console.error('Error deleting booking:', error.message || 'Unknown error');
+    return false;
   }
-  
-  const users = getUsers();
-  const userIndex = users.findIndex(u => u.id === userId);
-  
-  if (userIndex === -1) {
-    throw new Error('User not found');
-  }
-  
-  users[userIndex].role = newRole;
-  saveUsers(users);
-  return users[userIndex];
-}
-
-// Delete user
-function deleteUser(userId) {
-  const users = getUsers();
-  const filtered = users.filter(u => u.id !== userId);
-  
-  if (filtered.length === users.length) {
-    return false; // User not found
-  }
-  
-  saveUsers(filtered);
-  
-  // Also delete user's bookings
-  const bookings = getBookings();
-  const filteredBookings = bookings.filter(b => b.userId !== userId);
-  saveBookings(filteredBookings);
-  
   return true;
 }
 
-// Get all bookings (for admin)
-function getAllBookings() {
-  return getBookings();
+// Check if user is admin
+async function isAdmin(userId) {
+  const profile = await getProfile(userId);
+  return profile?.role === 'admin';
+}
+
+// Check if current user is admin
+async function isCurrentUserAdmin() {
+  const currentUser = await getCurrentUser();
+  return currentUser?.role === 'admin';
+}
+
+// Get all users (admin)
+async function getAllUsers() {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, role, name, email, created_at')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error loading users:', error.message || 'Unknown error');
+    return [];
+  }
+
+  return (data || []).map(user => ({
+    id: user.id,
+    role: user.role,
+    name: user.name,
+    email: user.email,
+    createdAt: user.created_at
+  }));
+}
+
+// Update user role
+async function updateUserRole(userId, newRole) {
+  if (newRole !== 'user' && newRole !== 'admin') {
+    throw new Error('Invalid role. Must be "user" or "admin"');
+  }
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from('profiles')
+    .update({ role: newRole })
+    .eq('id', userId)
+    .select('id, role, name, email, created_at')
+    .single();
+
+  if (error) {
+    throw new Error(error.message || 'Unable to update user role');
+  }
+  return data;
+}
+
+// Delete user (removes profile + bookings; auth user remains)
+async function deleteUser(userId) {
+  const supabase = getSupabaseClient();
+  await supabase.from('bookings').delete().eq('user_id', userId);
+  const { error } = await supabase.from('profiles').delete().eq('id', userId);
+  return !error;
+}
+
+// Get all bookings (admin)
+async function getAllBookings() {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from('bookings')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error loading bookings:', error.message || 'Unknown error');
+    return [];
+  }
+  return (data || []).map(mapBookingFromDb);
 }
 
 // Get booking statistics
-function getBookingStats() {
-  const bookings = getBookings();
+async function getBookingStats() {
+  const bookings = await getAllBookings();
   const stats = {
     total: bookings.length,
     pending: 0,
@@ -360,40 +365,40 @@ function getBookingStats() {
     residential: 0,
     commercial: 0
   };
-  
+
   bookings.forEach(booking => {
     const status = booking.status || 'pending';
     stats[status] = (stats[status] || 0) + 1;
-    
     if (booking.propertyType === 'residential') {
       stats.residential++;
     } else if (booking.propertyType === 'commercial') {
       stats.commercial++;
     }
   });
-  
+
   return stats;
 }
 
 // Get user statistics
-function getUserStats() {
-  const users = getUsers();
-  const signups = getSignups();
-  
+async function getUserStats() {
+  const users = await getAllUsers();
+  const now = new Date();
+  const weekAgo = new Date();
+  weekAgo.setDate(weekAgo.getDate() - 7);
+
   return {
     total: users.length,
     admins: users.filter(u => u.role === 'admin').length,
     regular: users.filter(u => u.role === 'user').length,
-    signupsToday: signups.filter(s => {
-      const signupDate = new Date(s.timestamp);
-      const today = new Date();
-      return signupDate.toDateString() === today.toDateString();
+    signupsToday: users.filter(u => {
+      if (!u.createdAt) return false;
+      const created = new Date(u.createdAt);
+      return created.toDateString() === now.toDateString();
     }).length,
-    signupsThisWeek: signups.filter(s => {
-      const signupDate = new Date(s.timestamp);
-      const weekAgo = new Date();
-      weekAgo.setDate(weekAgo.getDate() - 7);
-      return signupDate >= weekAgo;
+    signupsThisWeek: users.filter(u => {
+      if (!u.createdAt) return false;
+      const created = new Date(u.createdAt);
+      return created >= weekAgo;
     }).length
   };
 }
