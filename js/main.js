@@ -28,21 +28,12 @@ async function updateNavbar() {
     
     // Update desktop nav
     const desktopNav = document.querySelector('[data-desktop-nav]');
-    if (desktopNav) {
+    const desktopActions = document.querySelector('[data-desktop-actions]');
+    if (desktopNav && desktopActions) {
       // Remove any existing dynamic elements
-      const existingDropdown = desktopNav.querySelector('.user-dropdown-container');
-      const existingSignIn = desktopNav.querySelector('a[href="signin.html"]');
-      const existingDashboard = desktopNav.querySelector('a[href="dashboard.html"]');
-      const existingAdmin = desktopNav.querySelector('a[href="admin-dashboard.html"]');
-      
+      const existingDropdown = desktopActions.querySelector('.user-dropdown-container');
       if (existingDropdown) existingDropdown.remove();
-      if (existingSignIn && isAuth) existingSignIn.remove();
-      if (existingDashboard) existingDashboard.remove();
-      if (existingAdmin) existingAdmin.remove();
-      
-      // Get book link for positioning
-      const bookLink = desktopNav.querySelector('a[href="book-deep-clean.html"]');
-      
+
       if (isAuth && currentUser) {
         // User is signed in - show dropdown with icon
         const userDropdown = document.createElement('div');
@@ -105,12 +96,8 @@ async function updateNavbar() {
         userDropdown.appendChild(userButton);
         userDropdown.appendChild(dropdownMenu);
         
-        // Insert after book link or append to end
-        if (bookLink) {
-          desktopNav.insertBefore(userDropdown, bookLink.nextSibling);
-        } else {
-          desktopNav.appendChild(userDropdown);
-        }
+        // Insert after book button
+        desktopActions.appendChild(userDropdown);
       } else {
         // User is not signed in - show sign in dropdown
         const signInDropdown = document.createElement('div');
@@ -159,12 +146,8 @@ async function updateNavbar() {
         signInDropdown.appendChild(signInButton);
         signInDropdown.appendChild(dropdownMenu);
         
-        // Insert after book link or append to end
-        if (bookLink) {
-          desktopNav.insertBefore(signInDropdown, bookLink.nextSibling);
-        } else {
-          desktopNav.appendChild(signInDropdown);
-        }
+        // Insert after book button
+        desktopActions.appendChild(signInDropdown);
       }
     }
     

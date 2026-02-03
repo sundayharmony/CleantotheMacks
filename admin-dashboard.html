@@ -22,20 +22,26 @@
     <!-- Navbar -->
     <nav class="bg-white shadow-md sticky top-0 z-50">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between items-center h-16">
+            <div class="flex items-center h-16">
                 <a href="index.html" class="flex items-center">
                     <img src="logo.png" alt="Clean To The Mack's" class="h-12 w-auto" loading="eager">
                 </a>
                 
                 <!-- Desktop Navigation -->
-                <div class="hidden md:flex items-center space-x-8" data-desktop-nav>
-                    <a href="index.html" class="text-gray-700 hover:text-blue-600 transition font-medium">Home</a>
-                    <a href="our-work.html" class="text-gray-700 hover:text-blue-600 transition font-medium">Our Work</a>
+                <div class="hidden md:flex flex-1 justify-center" data-desktop-nav>
+                    <div class="flex items-center space-x-8">
+                        <a href="index.html" class="text-gray-700 hover:text-blue-600 transition font-medium">Home</a>
+                        <a href="our-work.html" class="text-gray-700 hover:text-blue-600 transition font-medium">Our Work</a>
+                        <a href="about-us.html" class="text-gray-700 hover:text-blue-600 transition font-medium">About Us</a>
+                    </div>
+                </div>
+
+                <div class="hidden md:flex items-center space-x-4" data-desktop-actions>
                     <a href="book-deep-clean.html" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition font-semibold">Book Deep Clean</a>
                 </div>
 
                 <!-- Mobile menu button -->
-                <div class="md:hidden">
+                <div class="md:hidden ml-auto">
                     <button id="mobile-menu-button" class="text-gray-700 hover:text-blue-600 transition" aria-label="Toggle menu">
                         <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
@@ -49,6 +55,7 @@
                 <div class="flex flex-col space-y-4">
                     <a href="index.html" class="text-gray-700 hover:text-blue-600 transition font-medium">Home</a>
                     <a href="our-work.html" class="text-gray-700 hover:text-blue-600 transition font-medium">Our Work</a>
+                    <a href="about-us.html" class="text-gray-700 hover:text-blue-600 transition font-medium">About Us</a>
                     <a href="book-deep-clean.html" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition font-semibold text-center">Book Deep Clean</a>
                     <a href="admin-dashboard.html" class="text-gray-700 hover:text-blue-600 transition font-medium">Admin</a>
                     <a href="signin.html" class="text-gray-700 hover:text-blue-600 transition font-medium">Sign Out</a>
@@ -315,7 +322,7 @@
                 <div>
                     <h4 class="font-semibold mb-4 text-white">Company</h4>
                     <ul class="space-y-2 text-gray-400">
-                        <li><a href="index.html" class="hover:text-white transition">About Us</a></li>
+                        <li><a href="about-us.html" class="hover:text-white transition">About Us</a></li>
                     </ul>
                 </div>
                 
