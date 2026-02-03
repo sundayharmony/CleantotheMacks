@@ -495,6 +495,27 @@ document.addEventListener('DOMContentLoaded', async function() {
   // Form handling
   const intakeForm = document.getElementById('intake-form');
   if (intakeForm) {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/056e9111-25d8-44b5-b858-fb015bcd41ec',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run2',hypothesisId:'H2',location:'js/main.js:506',message:'intakeForm found',data:{hasSubmitButton:!!intakeForm.querySelector('button[type="submit"]')},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion agent log
+
+    intakeForm.addEventListener('invalid', function(e) {
+      const target = e.target;
+      if (!target) return;
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/056e9111-25d8-44b5-b858-fb015bcd41ec',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run2',hypothesisId:'H2',location:'js/main.js:514',message:'invalid field triggered',data:{id:target.id,name:target.name,type:target.type,required:target.required,disabled:target.disabled,visible:!!target.offsetParent,valuePresent:!!target.value},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion agent log
+    }, true);
+
+    const submitButton = intakeForm.querySelector('button[type="submit"]');
+    if (submitButton) {
+      submitButton.addEventListener('click', function() {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/056e9111-25d8-44b5-b858-fb015bcd41ec',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run2',hypothesisId:'H2',location:'js/main.js:522',message:'submit button clicked',data:{formValid:intakeForm.checkValidity(),invalidCount:intakeForm.querySelectorAll(':invalid').length},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion agent log
+      });
+    }
+
     intakeForm.addEventListener('submit', async function(e) {
       e.preventDefault();
       // #region agent log
