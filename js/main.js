@@ -248,6 +248,9 @@ async function updateNavbar() {
 
 // Mobile menu toggle
 document.addEventListener('DOMContentLoaded', async function() {
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/056e9111-25d8-44b5-b858-fb015bcd41ec',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H3',location:'js/main.js:445',message:'DOMContentLoaded booking form handler start',data:{hasIntakeForm:!!document.getElementById('intake-form')},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion agent log
   // Update navbar on page load
   updateNavbar();
   
@@ -421,6 +424,9 @@ document.addEventListener('DOMContentLoaded', async function() {
   });
 
   const applyPropertyType = (propertyType) => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/056e9111-25d8-44b5-b858-fb015bcd41ec',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H1',location:'js/main.js:462',message:'applyPropertyType called',data:{propertyType},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion agent log
     if (propertyType === 'residential') {
       if (residentialFields) residentialFields.style.display = 'block';
       if (commercialFields) commercialFields.style.display = 'none';
@@ -446,6 +452,11 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
       });
     }
+    // #region agent log
+    const requiredResidential = residentialFields?.querySelectorAll('.residential-field[required]').length || 0;
+    const requiredCommercial = commercialFields?.querySelectorAll('.commercial-field[required]').length || 0;
+    fetch('http://127.0.0.1:7242/ingest/056e9111-25d8-44b5-b858-fb015bcd41ec',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H1',location:'js/main.js:489',message:'applyPropertyType required counts',data:{requiredResidential,requiredCommercial,residentialVisible:residentialFields?.style?.display,commercialVisible:commercialFields?.style?.display},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion agent log
   };
 
   if (propertyTypeRadios.length > 0) {
@@ -486,6 +497,10 @@ document.addEventListener('DOMContentLoaded', async function() {
   if (intakeForm) {
     intakeForm.addEventListener('submit', async function(e) {
       e.preventDefault();
+      // #region agent log
+      const invalidFields = intakeForm.querySelectorAll(':invalid').length;
+      fetch('http://127.0.0.1:7242/ingest/056e9111-25d8-44b5-b858-fb015bcd41ec',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H2',location:'js/main.js:512',message:'intakeForm submit handler fired',data:{invalidFields},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion agent log
       
       // Hide error message if shown
       const errorMessage = document.getElementById('error-message');
@@ -496,6 +511,9 @@ document.addEventListener('DOMContentLoaded', async function() {
       // Get form data
       const formData = new FormData(this);
       const propertyType = formData.get('propertyType');
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/056e9111-25d8-44b5-b858-fb015bcd41ec',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H2',location:'js/main.js:523',message:'form data collected',data:{propertyType},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion agent log
       const currentUser = await safeGetCurrentUser();
       
       // Validate required fields
@@ -504,6 +522,9 @@ document.addEventListener('DOMContentLoaded', async function() {
           errorMessage.textContent = 'Please select a property type';
           errorMessage.classList.remove('hidden');
         }
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/056e9111-25d8-44b5-b858-fb015bcd41ec',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H2',location:'js/main.js:534',message:'missing propertyType',data:{},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion agent log
         return;
       }
       
@@ -512,6 +533,9 @@ document.addEventListener('DOMContentLoaded', async function() {
           errorMessage.textContent = 'Please sign in to submit a booking.';
           errorMessage.classList.remove('hidden');
         }
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/056e9111-25d8-44b5-b858-fb015bcd41ec',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H4',location:'js/main.js:545',message:'submit blocked: no currentUser',data:{},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion agent log
         setTimeout(() => {
           window.location.href = 'signin.html';
         }, 1500);
