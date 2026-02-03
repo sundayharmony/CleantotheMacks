@@ -437,19 +437,27 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (field.dataset.required === 'true') {
           field.setAttribute('required', 'required');
         }
+        field.removeAttribute('disabled');
       });
-      commercialInputs.forEach(field => field.removeAttribute('required'));
+      commercialInputs.forEach(field => {
+        field.removeAttribute('required');
+        field.setAttribute('disabled', 'disabled');
+      });
     } else if (propertyType === 'commercial') {
       if (residentialFields) residentialFields.style.display = 'none';
       if (commercialFields) commercialFields.style.display = 'block';
 
       const residentialInputs = residentialFields?.querySelectorAll('.residential-field') || [];
       const commercialInputs = commercialFields?.querySelectorAll('.commercial-field') || [];
-      residentialInputs.forEach(field => field.removeAttribute('required'));
+      residentialInputs.forEach(field => {
+        field.removeAttribute('required');
+        field.setAttribute('disabled', 'disabled');
+      });
       commercialInputs.forEach(field => {
         if (field.dataset.required === 'true') {
           field.setAttribute('required', 'required');
         }
+        field.removeAttribute('disabled');
       });
     }
     // #region agent log
