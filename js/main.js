@@ -412,39 +412,51 @@ document.addEventListener('DOMContentLoaded', async function() {
   const propertyTypeRadios = document.querySelectorAll('input[name="propertyType"]');
   const residentialFields = document.getElementById('residential-fields');
   const commercialFields = document.getElementById('commercial-fields');
-  
+
+  const allPropertyFields = document.querySelectorAll('.residential-field, .commercial-field');
+  allPropertyFields.forEach(field => {
+    if (field.hasAttribute('required')) {
+      field.dataset.required = 'true';
+    }
+  });
+
+  const applyPropertyType = (propertyType) => {
+    if (propertyType === 'residential') {
+      if (residentialFields) residentialFields.style.display = 'block';
+      if (commercialFields) commercialFields.style.display = 'none';
+
+      const residentialInputs = residentialFields?.querySelectorAll('.residential-field') || [];
+      const commercialInputs = commercialFields?.querySelectorAll('.commercial-field') || [];
+      residentialInputs.forEach(field => {
+        if (field.dataset.required === 'true') {
+          field.setAttribute('required', 'required');
+        }
+      });
+      commercialInputs.forEach(field => field.removeAttribute('required'));
+    } else if (propertyType === 'commercial') {
+      if (residentialFields) residentialFields.style.display = 'none';
+      if (commercialFields) commercialFields.style.display = 'block';
+
+      const residentialInputs = residentialFields?.querySelectorAll('.residential-field') || [];
+      const commercialInputs = commercialFields?.querySelectorAll('.commercial-field') || [];
+      residentialInputs.forEach(field => field.removeAttribute('required'));
+      commercialInputs.forEach(field => {
+        if (field.dataset.required === 'true') {
+          field.setAttribute('required', 'required');
+        }
+      });
+    }
+  };
+
   if (propertyTypeRadios.length > 0) {
     propertyTypeRadios.forEach(radio => {
       radio.addEventListener('change', function() {
-        if (this.value === 'residential') {
-          if (residentialFields) residentialFields.style.display = 'block';
-          if (commercialFields) commercialFields.style.display = 'none';
-          
-          // Update required attributes
-          const residentialRequired = residentialFields?.querySelectorAll('.residential-field[required]');
-          const commercialRequired = commercialFields?.querySelectorAll('.commercial-field[required]');
-          if (residentialRequired) {
-            residentialRequired.forEach(field => field.setAttribute('required', 'required'));
-          }
-          if (commercialRequired) {
-            commercialRequired.forEach(field => field.removeAttribute('required'));
-          }
-        } else if (this.value === 'commercial') {
-          if (residentialFields) residentialFields.style.display = 'none';
-          if (commercialFields) commercialFields.style.display = 'block';
-          
-          // Update required attributes
-          const residentialRequired = residentialFields?.querySelectorAll('.residential-field[required]');
-          const commercialRequired = commercialFields?.querySelectorAll('.commercial-field[required]');
-          if (residentialRequired) {
-            residentialRequired.forEach(field => field.removeAttribute('required'));
-          }
-          if (commercialRequired) {
-            commercialRequired.forEach(field => field.setAttribute('required', 'required'));
-          }
-        }
+        applyPropertyType(this.value);
       });
     });
+
+    const selected = document.querySelector('input[name="propertyType"]:checked')?.value || 'residential';
+    applyPropertyType(selected);
   }
 
   // Auto-fill form if user is logged in
