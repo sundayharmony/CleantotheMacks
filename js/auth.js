@@ -202,10 +202,7 @@ async function isAuthenticated() {
 async function createBooking(bookingData) {
   const supabase = getSupabaseClient();
   const currentUser = await getCurrentUser();
-  const userId = bookingData.userId || currentUser?.id;
-  if (!userId) {
-    throw new Error('You must be signed in to create a booking.');
-  }
+  const userId = bookingData.userId || currentUser?.id || null;
 
   const payload = mapBookingToDb(bookingData, userId);
   const { data, error } = await supabase

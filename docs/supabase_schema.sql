@@ -17,7 +17,7 @@ create table if not exists public.profiles (
 -- Bookings table
 create table if not exists public.bookings (
   id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references auth.users(id) on delete cascade,
+  user_id uuid references auth.users(id) on delete cascade,
   status text not null default 'pending',
   property_type text not null,
   name text,
@@ -97,7 +97,10 @@ using (auth.uid() = user_id or public.is_admin(auth.uid()));
 drop policy if exists "bookings_insert_own" on public.bookings;
 create policy "bookings_insert_own"
 on public.bookings for insert
-with check (auth.uid() = user_id);
+with check (
+  (auth.uid() = user_id)
+  or (auth.uid() is null and user_id is null)
+);
 
 drop policy if exists "bookings_update_own" on public.bookings;
 create policy "bookings_update_own"

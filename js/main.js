@@ -611,20 +611,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         return;
       }
       
-      if (!activeUser) {
-        setFormMessage(
-          errorMessage,
-          'success',
-          'Thanks! Your request is received. We will reach out soon to confirm details.'
-        );
-        intakeForm.reset();
-        applyPropertyType('residential');
-        setButtonLoading(submitButton, false);
-        return;
-      }
-
       const bookingData = {
-        userId: activeUser.id,
+        userId: activeUser?.id || null,
         propertyType: propertyType,
         name: formData.get('name')?.trim() || '',
         email: formData.get('email')?.trim() || '',
@@ -676,10 +664,15 @@ document.addEventListener('DOMContentLoaded', async function() {
           
           setFormMessage(errorMessage, 'success', 'Booking request submitted successfully!');
           
-          // Redirect or show message
-          setTimeout(() => {
-            window.location.href = 'dashboard.html';
-          }, 1500);
+          if (activeUser) {
+            setTimeout(() => {
+              window.location.href = 'dashboard.html';
+            }, 1500);
+          } else {
+            intakeForm.reset();
+            applyPropertyType('residential');
+            setButtonLoading(submitButton, false);
+          }
         } catch (error) {
           console.error('Error creating booking:', error.message || 'Unknown error');
           setFormMessage(errorMessage, 'error', 'Error submitting booking. Please try again.');
