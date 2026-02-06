@@ -212,6 +212,9 @@ async function createBooking(bookingData) {
     .single();
 
   if (error) {
+    if (error.status === 401) {
+      throw new Error('Booking service unavailable. Please try again later.');
+    }
     throw new Error(error.message || 'Unable to create booking');
   }
   return mapBookingFromDb(data);

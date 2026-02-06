@@ -18,6 +18,13 @@ function getSupabaseClient() {
   if (!isSupabaseConfigured()) {
     console.warn('Supabase is not configured. Update SUPABASE_URL and SUPABASE_ANON_KEY.');
   }
-  supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    global: {
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`
+      }
+    }
+  });
   return supabaseClient;
 }
