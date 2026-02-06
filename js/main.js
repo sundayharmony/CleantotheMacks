@@ -466,6 +466,25 @@ function loadFormConfiguration() {
   }
 }
 
+function initAddressAutocomplete() {
+  const addressInput = document.getElementById('address');
+  if (!addressInput || typeof window.places !== 'function') return;
+
+  const appId = window.ALGOLIA_APP_ID;
+  const apiKey = window.ALGOLIA_API_KEY;
+  if (!appId || !apiKey || appId.includes('YOUR_') || apiKey.includes('YOUR_')) {
+    console.warn('Algolia Places not configured. Set ALGOlIA_APP_ID and ALGOlIA_API_KEY.');
+    return;
+  }
+
+  window.places({
+    appId,
+    apiKey,
+    container: addressInput,
+    type: 'address'
+  });
+}
+
 // Property type toggle for booking form
 document.addEventListener('DOMContentLoaded', async function() {
   // Property type toggle
@@ -553,6 +572,9 @@ document.addEventListener('DOMContentLoaded', async function() {
 
   // Load form configuration and update labels/options
   loadFormConfiguration();
+
+  // Initialize address autocomplete
+  initAddressAutocomplete();
 
   // Form handling
   const intakeForm = document.getElementById('intake-form');
