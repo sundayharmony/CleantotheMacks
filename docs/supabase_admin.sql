@@ -2,4 +2,4 @@
 -- Replace email if needed
 update public.profiles
 set role = 'admin'
-where email = 'sales@sundayharmony.com';
+where email = 'stisby3@gmail.com';
