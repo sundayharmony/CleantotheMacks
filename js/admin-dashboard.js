@@ -2,6 +2,7 @@
 
 let currentFilterStatus = 'all';
 let currentFilterProperty = 'all';
+let cachedBookings = [];
 
 document.addEventListener('DOMContentLoaded', async function() {
   // Check admin authentication
@@ -147,7 +148,14 @@ function initializeTabs() {
           // Load content based on tab
           if (tab === 'calendar') {
             const today = new Date();
-            renderCalendar(today.getFullYear(), today.getMonth(), 'admin-calendar-container', handleAdminDateClick, handleAdminBookingClick);
+            renderCalendar(
+              today.getFullYear(),
+              today.getMonth(),
+              'admin-calendar-container',
+              handleAdminDateClick,
+              handleAdminBookingClick,
+              cachedBookings
+            );
           } else if (tab === 'users') {
             loadAllUsers();
           } else if (tab === 'form-builder') {
@@ -176,9 +184,12 @@ async function loadStatistics() {
 
 // Load all bookings with filters
 async function loadAllBookings() {
-  let bookings = await getAllBookings();
+  const allBookings = await getAllBookings();
+  cachedBookings = allBookings;
 
-  // Apply filters
+  let bookings = allBookings;
+
+  // Apply filters (for list view only)
   if (currentFilterStatus !== 'all') {
     bookings = bookings.filter(b => (b.status || 'pending') === currentFilterStatus);
   }
@@ -199,7 +210,7 @@ async function loadAllBookings() {
         <p class="text-gray-600">No bookings found.</p>
       </div>
     `;
-    return;
+    return bookings;
   }
 
   let html = '';
@@ -253,6 +264,7 @@ async function loadAllBookings() {
   });
 
   bookingsList.innerHTML = html;
+  return bookings;
 }
 
 // Handle admin date click
@@ -592,19 +604,27 @@ async function saveBookingChanges(bookingId) {
     const calendarTab = document.getElementById('content-calendar');
     if (calendarTab && !calendarTab.classList.contains('hidden')) {
       const today = new Date();
-      renderCalendar(today.getFullYear(), today.getMonth(), 'admin-calendar-container', handleAdminDateClick, handleAdminBookingClick);
+      renderCalendar(
+        today.getFullYear(),
+        today.getMonth(),
+        'admin-calendar-container',
+        handleAdminDateClick,
+        handleAdminBookingClick,
+        cachedBookings
+      );
     }
     
     // Close modal
     const modal = document.getElementById('booking-modal');
     if (modal) modal.classList.add('hidden');
     
-    alert('Booking updated successfully!');
+    showAdminNotice('success', 'Booking updated successfully.');
   } catch (error) {
     if (errorMessage) {
       errorMessage.textContent = 'Error updating booking: ' + error.message;
       errorMessage.classList.remove('hidden');
     }
+    showAdminNotice('error', 'Error updating booking. Please try again.');
   }
 }
 
@@ -620,7 +640,14 @@ async function updateAdminBookingStatus(bookingId, status) {
   const calendarTab = document.getElementById('content-calendar');
   if (calendarTab && !calendarTab.classList.contains('hidden')) {
     const today = new Date();
-    renderCalendar(today.getFullYear(), today.getMonth(), 'admin-calendar-container', handleAdminDateClick, handleAdminBookingClick);
+    renderCalendar(
+      today.getFullYear(),
+      today.getMonth(),
+      'admin-calendar-container',
+      handleAdminDateClick,
+      handleAdminBookingClick,
+      cachedBookings
+    );
   }
   
   // Close modal
@@ -641,7 +668,14 @@ async function deleteAdminBooking(bookingId) {
     const calendarTab = document.getElementById('content-calendar');
     if (calendarTab && !calendarTab.classList.contains('hidden')) {
       const today = new Date();
-      renderCalendar(today.getFullYear(), today.getMonth(), 'admin-calendar-container', handleAdminDateClick, handleAdminBookingClick);
+      renderCalendar(
+        today.getFullYear(),
+        today.getMonth(),
+        'admin-calendar-container',
+        handleAdminDateClick,
+        handleAdminBookingClick,
+        cachedBookings
+      );
     }
     
     // Close modal
@@ -784,9 +818,9 @@ async function promoteToAdmin(userId) {
     try {
       await updateUserRole(userId, 'admin');
       await loadAllUsers();
-      alert('User promoted to admin successfully!');
+      showAdminNotice('success', 'User promoted to admin successfully.');
     } catch (error) {
-      alert('Error: ' + error.message);
+      showAdminNotice('error', 'Error promoting user: ' + error.message);
     }
   }
 }
@@ -802,9 +836,9 @@ async function deleteAdminUser(userId) {
       await deleteUser(userId);
       await loadStatistics();
       await loadAllUsers();
-      alert('User deleted successfully!');
+      showAdminNotice('success', 'User deleted successfully.');
     } catch (error) {
-      alert('Error: ' + error.message);
+      showAdminNotice('error', 'Error deleting user: ' + error.message);
     }
   }
 }
@@ -1193,17 +1227,25 @@ function saveFormConfiguration() {
   };
   
   // Save configuration
-  saveFormConfig(config);
-  alert('Form configuration saved successfully! Changes will apply to new bookings.');
+  try {
+    saveFormConfig(config);
+    showAdminNotice('success', 'Form configuration saved. Changes apply to new bookings.');
+  } catch (error) {
+    showAdminNotice('error', error.message || 'Unable to save form configuration.');
+  }
 }
 
 // Reset form configuration
 function resetFormConfiguration() {
   if (confirm('Are you sure you want to reset the form to default settings? This will lose all customizations.')) {
     const defaultConfig = getDefaultFormConfig();
-    saveFormConfig(defaultConfig);
-    loadFormBuilder();
-    alert('Form configuration reset to defaults.');
+    try {
+      saveFormConfig(defaultConfig);
+      loadFormBuilder();
+      showAdminNotice('success', 'Form configuration reset to defaults.');
+    } catch (error) {
+      showAdminNotice('error', error.message || 'Unable to reset form configuration.');
+    }
   }
 }
 
@@ -1344,7 +1386,7 @@ function loadSettings() {
 function saveSettings() {
   const membershipToggle = document.getElementById('toggle-membership');
   if (!membershipToggle) {
-    alert('Error: Could not find membership toggle. Please refresh the page and try again.');
+    showAdminNotice('error', 'Could not find membership toggle. Please refresh and try again.');
     return;
   }
   
@@ -1374,10 +1416,25 @@ function saveSettings() {
       }, 2000);
     }
     
-    // Show alert for other pages
-    alert('Settings saved successfully! The membership link will be ' + (settings.showMembership ? 'visible' : 'hidden') + ' in the navigation bar.');
+    showAdminNotice(
+      'success',
+      'Settings saved. Membership link is now ' + (settings.showMembership ? 'visible' : 'hidden') + ' in the navigation.'
+    );
   } catch (error) {
     console.error('Error saving settings:', error);
-    alert('Error saving settings. Please try again.');
+    showAdminNotice('error', 'Error saving settings. Please try again.');
+  }
+}
+
+function showAdminNotice(type, message) {
+  const notice = document.getElementById('admin-notice');
+  if (!notice) return;
+
+  notice.textContent = message;
+  notice.classList.remove('hidden', 'bg-red-100', 'text-red-800', 'bg-green-100', 'text-green-800');
+  if (type === 'error') {
+    notice.classList.add('bg-red-100', 'text-red-800');
+  } else {
+    notice.classList.add('bg-green-100', 'text-green-800');
   }
 }

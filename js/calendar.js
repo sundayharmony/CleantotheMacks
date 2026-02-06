@@ -1,25 +1,10 @@
 // Calendar component for booking management
 
-// Get bookings for a specific month
-function getBookingsForMonth(year, month) {
-  if (typeof getBookings === 'undefined') return [];
-  
-  const bookings = getBookings();
-  return bookings.filter(booking => {
-    if (!booking.preferredDate) return false;
-    const bookingDate = new Date(booking.preferredDate);
-    return bookingDate.getFullYear() === year && bookingDate.getMonth() === month;
-  });
-}
-
 // Get bookings for a specific date
-function getBookingsForDate(year, month, day) {
-  if (typeof getBookings === 'undefined') return [];
-  
-  const bookings = getBookings();
+function getBookingsForDate(bookings, year, month, day) {
   const targetDate = new Date(year, month, day).toISOString().split('T')[0];
   
-  return bookings.filter(booking => {
+  return (bookings || []).filter(booking => {
     if (!booking.preferredDate) return false;
     const bookingDate = new Date(booking.preferredDate).toISOString().split('T')[0];
     return bookingDate === targetDate;
@@ -27,16 +12,13 @@ function getBookingsForDate(year, month, day) {
 }
 
 // Render calendar for a given month/year
-function renderCalendar(year, month, containerId, onDateClick, onBookingClick) {
+function renderCalendar(year, month, containerId, onDateClick, onBookingClick, bookings = []) {
   const container = document.getElementById(containerId);
   if (!container) return;
   
   const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'];
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  
-  // Get bookings for this month
-  const bookings = getBookingsForMonth(year, month);
   
   // Get first day of month and number of days
   const firstDay = new Date(year, month, 1).getDay();
@@ -75,7 +57,7 @@ function renderCalendar(year, month, containerId, onDateClick, onBookingClick) {
   
   // Days of the month
   for (let day = 1; day <= daysInMonth; day++) {
-    const dateBookings = getBookingsForDate(year, month, day);
+    const dateBookings = getBookingsForDate(bookings, year, month, day);
     const isToday = day === todayDate;
     
     html += `
@@ -123,14 +105,14 @@ function renderCalendar(year, month, containerId, onDateClick, onBookingClick) {
   if (prevButton) {
     prevButton.addEventListener('click', () => {
       const newDate = new Date(year, month - 1, 1);
-      renderCalendar(newDate.getFullYear(), newDate.getMonth(), containerId, onDateClick, onBookingClick);
+      renderCalendar(newDate.getFullYear(), newDate.getMonth(), containerId, onDateClick, onBookingClick, bookings);
     });
   }
   
   if (nextButton) {
     nextButton.addEventListener('click', () => {
       const newDate = new Date(year, month + 1, 1);
-      renderCalendar(newDate.getFullYear(), newDate.getMonth(), containerId, onDateClick, onBookingClick);
+      renderCalendar(newDate.getFullYear(), newDate.getMonth(), containerId, onDateClick, onBookingClick, bookings);
     });
   }
   

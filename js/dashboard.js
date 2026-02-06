@@ -1,4 +1,4 @@
-// Dashboard functionality
+﻿// Dashboard functionality
 
 document.addEventListener('DOMContentLoaded', async function() {
   // Load utility functions if available

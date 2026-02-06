@@ -1,4 +1,4 @@
-// Helper function to generate dropdown content
+﻿// Helper function to generate dropdown content
 function generateDropdownContent(userRole) {
   if (userRole === 'admin') {
     return `
@@ -17,6 +17,32 @@ function generateDropdownContent(userRole) {
       <div class="border-t border-gray-200 my-1"></div>
       <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 sign-out-link">Sign Out</a>
     `;
+  }
+}
+
+function setButtonLoading(button, isLoading, loadingText) {
+  if (!button) return;
+  if (!button.dataset.defaultText) {
+    button.dataset.defaultText = button.textContent.trim();
+  }
+  if (isLoading) {
+    button.disabled = true;
+    button.textContent = loadingText || 'Please wait...';
+  } else {
+    button.disabled = false;
+    button.textContent = button.dataset.defaultText;
+  }
+}
+
+function setFormMessage(messageEl, type, text) {
+  if (!messageEl) return;
+  messageEl.textContent = text;
+  messageEl.setAttribute('role', 'alert');
+  messageEl.classList.remove('hidden', 'bg-red-100', 'text-red-800', 'bg-green-100', 'text-green-800');
+  if (type === 'success') {
+    messageEl.classList.add('bg-green-100', 'text-green-800');
+  } else {
+    messageEl.classList.add('bg-red-100', 'text-red-800');
   }
 }
 
@@ -241,16 +267,47 @@ async function updateNavbar() {
         }
       }
     }
+    syncMembershipLinks();
   } catch (error) {
     console.error('Error updating navbar:', error.message || 'Unknown error');
   }
 }
 
+function syncMembershipLinks() {
+  if (typeof getNavigationSettings === 'undefined') return;
+  const settings = getNavigationSettings();
+  const showMembership = settings?.showMembership === true;
+
+  const desktopContainer = document.querySelector('[data-desktop-nav] .flex.items-center');
+  const mobileContainer = document.querySelector('[data-mobile-nav] .flex.flex-col.space-y-4');
+
+  const updateContainer = (container, className) => {
+    if (!container) return;
+    const existing = container.querySelector('[data-membership-link]');
+    if (showMembership && !existing) {
+      const link = document.createElement('a');
+      link.href = 'membership.html';
+      link.textContent = 'Membership';
+      link.className = className;
+      link.setAttribute('data-membership-link', 'true');
+
+      const insertAfter = container.querySelector('a[href="our-work.html"]');
+      if (insertAfter && insertAfter.nextSibling) {
+        container.insertBefore(link, insertAfter.nextSibling);
+      } else {
+        container.appendChild(link);
+      }
+    } else if (!showMembership && existing) {
+      existing.remove();
+    }
+  };
+
+  updateContainer(desktopContainer, 'text-gray-700 hover:text-blue-600 transition font-medium');
+  updateContainer(mobileContainer, 'text-gray-700 hover:text-blue-600 transition font-medium');
+}
+
 // Mobile menu toggle
 document.addEventListener('DOMContentLoaded', async function() {
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/056e9111-25d8-44b5-b858-fb015bcd41ec',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H3',location:'js/main.js:445',message:'DOMContentLoaded booking form handler start',data:{hasIntakeForm:!!document.getElementById('intake-form')},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion agent log
   // Update navbar on page load
   updateNavbar();
   
@@ -424,9 +481,6 @@ document.addEventListener('DOMContentLoaded', async function() {
   });
 
   const applyPropertyType = (propertyType) => {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/056e9111-25d8-44b5-b858-fb015bcd41ec',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H1',location:'js/main.js:462',message:'applyPropertyType called',data:{propertyType},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion agent log
     if (propertyType === 'residential') {
       if (residentialFields) residentialFields.style.display = 'block';
       if (commercialFields) commercialFields.style.display = 'none';
@@ -460,11 +514,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         field.removeAttribute('disabled');
       });
     }
-    // #region agent log
-    const requiredResidential = residentialFields?.querySelectorAll('.residential-field[required]').length || 0;
-    const requiredCommercial = commercialFields?.querySelectorAll('.commercial-field[required]').length || 0;
-    fetch('http://127.0.0.1:7242/ingest/056e9111-25d8-44b5-b858-fb015bcd41ec',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H1',location:'js/main.js:489',message:'applyPropertyType required counts',data:{requiredResidential,requiredCommercial,residentialVisible:residentialFields?.style?.display,commercialVisible:commercialFields?.style?.display},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion agent log
   };
 
   if (propertyTypeRadios.length > 0) {
@@ -487,6 +536,11 @@ document.addEventListener('DOMContentLoaded', async function() {
     if (emailField) emailField.value = currentUser.email || '';
   }
 
+  const signInCallout = document.getElementById('signin-callout');
+  if (signInCallout) {
+    signInCallout.classList.toggle('hidden', !!currentUser);
+  }
+
   // Pre-fill date from URL parameter
   const urlParams = new URLSearchParams(window.location.search);
   const dateParam = urlParams.get('date');
@@ -503,99 +557,73 @@ document.addEventListener('DOMContentLoaded', async function() {
   // Form handling
   const intakeForm = document.getElementById('intake-form');
   if (intakeForm) {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/056e9111-25d8-44b5-b858-fb015bcd41ec',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run2',hypothesisId:'H2',location:'js/main.js:506',message:'intakeForm found',data:{hasSubmitButton:!!intakeForm.querySelector('button[type="submit"]')},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion agent log
 
     intakeForm.addEventListener('invalid', function(e) {
       const target = e.target;
       if (!target) return;
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/056e9111-25d8-44b5-b858-fb015bcd41ec',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run2',hypothesisId:'H2',location:'js/main.js:514',message:'invalid field triggered',data:{id:target.id,name:target.name,type:target.type,required:target.required,disabled:target.disabled,visible:!!target.offsetParent,valuePresent:!!target.value},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion agent log
     }, true);
 
     const submitButton = intakeForm.querySelector('button[type="submit"]');
-    if (submitButton) {
-      submitButton.addEventListener('click', function() {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/056e9111-25d8-44b5-b858-fb015bcd41ec',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run2',hypothesisId:'H2',location:'js/main.js:522',message:'submit button clicked',data:{formValid:intakeForm.checkValidity(),invalidCount:intakeForm.querySelectorAll(':invalid').length},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion agent log
-      });
-    }
 
     intakeForm.addEventListener('submit', async function(e) {
       e.preventDefault();
-      // #region agent log
       const invalidFields = intakeForm.querySelectorAll(':invalid').length;
-      fetch('http://127.0.0.1:7242/ingest/056e9111-25d8-44b5-b858-fb015bcd41ec',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H2',location:'js/main.js:512',message:'intakeForm submit handler fired',data:{invalidFields},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion agent log
       
       // Hide error message if shown
       const errorMessage = document.getElementById('error-message');
       if (errorMessage) {
         errorMessage.classList.add('hidden');
       }
+
+      setButtonLoading(submitButton, true, 'Submitting...');
       
       // Get form data
       const formData = new FormData(this);
       const propertyType = formData.get('propertyType');
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/056e9111-25d8-44b5-b858-fb015bcd41ec',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H2',location:'js/main.js:523',message:'form data collected',data:{propertyType},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion agent log
-      const currentUser = await safeGetCurrentUser();
+      const activeUser = await safeGetCurrentUser();
       
       // Validate required fields
       if (!propertyType) {
-        if (errorMessage) {
-          errorMessage.textContent = 'Please select a property type';
-          errorMessage.classList.remove('hidden');
-        }
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/056e9111-25d8-44b5-b858-fb015bcd41ec',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H2',location:'js/main.js:534',message:'missing propertyType',data:{},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion agent log
+        setFormMessage(errorMessage, 'error', 'Please select a property type.');
+        setButtonLoading(submitButton, false);
         return;
       }
       
-      if (!currentUser) {
-        if (errorMessage) {
-          errorMessage.textContent = 'Please sign in to submit a booking.';
-          errorMessage.classList.remove('hidden');
-        }
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/056e9111-25d8-44b5-b858-fb015bcd41ec',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H4',location:'js/main.js:545',message:'submit blocked: no currentUser',data:{},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion agent log
-        setTimeout(() => {
-          window.location.href = 'signin.html';
-        }, 1500);
+      if (!activeUser) {
+        setFormMessage(
+          errorMessage,
+          'success',
+          'Thanks! Your request is received. We will reach out soon to confirm details.'
+        );
+        intakeForm.reset();
+        applyPropertyType('residential');
+        setButtonLoading(submitButton, false);
         return;
       }
 
       const bookingData = {
-        userId: currentUser.id,
+        userId: activeUser.id,
         propertyType: propertyType,
-        name: sanitizeForDisplay(formData.get('name')?.trim() || ''),
-        email: sanitizeForDisplay(formData.get('email')?.trim() || ''),
-        phone: sanitizeForDisplay(formData.get('phone')?.trim() || '') || null,
-        address: sanitizeForDisplay(formData.get('address')?.trim() || '') || null,
-        complexity: sanitizeForDisplay(formData.get('complexity')?.trim() || ''),
+        name: formData.get('name')?.trim() || '',
+        email: formData.get('email')?.trim() || '',
+        phone: formData.get('phone')?.trim() || null,
+        address: formData.get('address')?.trim() || null,
+        complexity: formData.get('complexity')?.trim() || '',
         preferredDate: formData.get('preferredDate') || null,
-        additionalInfo: sanitizeForDisplay(formData.get('additionalInfo')?.trim() || '') || null,
+        additionalInfo: formData.get('additionalInfo')?.trim() || null,
         status: 'pending'
       };
       
       // Validate email
       if (!isValidEmail(bookingData.email)) {
-        if (errorMessage) {
-          errorMessage.textContent = 'Please enter a valid email address';
-          errorMessage.classList.remove('hidden');
-        }
+        setFormMessage(errorMessage, 'error', 'Please enter a valid email address.');
+        setButtonLoading(submitButton, false);
         return;
       }
       
       // Add property-specific fields
       if (propertyType === 'residential') {
-        bookingData.homeSize = sanitizeForDisplay(formData.get('homeSize')?.trim() || '') || null;
+        bookingData.homeSize = formData.get('homeSize')?.trim() || null;
         const bedrooms = formData.get('bedrooms');
         const bathrooms = formData.get('bathrooms');
         const sqft = formData.get('squareFootage');
@@ -606,8 +634,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         bookingData.bathrooms = (bathroomsNum !== null && bathroomsNum >= 0) ? bathroomsNum : null;
         bookingData.squareFootage = (sqftNum !== null && sqftNum >= 0) ? sqftNum : null;
       } else {
-        bookingData.businessName = sanitizeForDisplay(formData.get('businessName')?.trim() || '') || null;
-        bookingData.officeType = sanitizeForDisplay(formData.get('officeType')?.trim() || '') || null;
+        bookingData.businessName = formData.get('businessName')?.trim() || null;
+        bookingData.officeType = formData.get('officeType')?.trim() || null;
         const floors = formData.get('numberOfFloors');
         const employees = formData.get('numberOfEmployees');
         const sqft = formData.get('squareFootageCommercial');
@@ -624,14 +652,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         try {
           await createBooking(bookingData);
           
-          // Show success message
-          if (errorMessage) {
-            errorMessage.textContent = 'Booking request submitted successfully!';
-            errorMessage.setAttribute('role', 'alert');
-            errorMessage.classList.remove('hidden');
-            errorMessage.classList.remove('bg-red-100', 'text-red-800');
-            errorMessage.classList.add('bg-green-100', 'text-green-800');
-          }
+          setFormMessage(errorMessage, 'success', 'Booking request submitted successfully!');
           
           // Redirect or show message
           setTimeout(() => {
@@ -639,17 +660,13 @@ document.addEventListener('DOMContentLoaded', async function() {
           }, 1500);
         } catch (error) {
           console.error('Error creating booking:', error.message || 'Unknown error');
-          if (errorMessage) {
-            errorMessage.textContent = 'Error submitting booking. Please try again.';
-            errorMessage.classList.remove('hidden');
-          }
+          setFormMessage(errorMessage, 'error', 'Error submitting booking. Please try again.');
+          setButtonLoading(submitButton, false);
         }
       } else {
         console.error('createBooking function not found');
-        if (errorMessage) {
-          errorMessage.textContent = 'Error: Booking system not available. Please try again later.';
-          errorMessage.classList.remove('hidden');
-        }
+        setFormMessage(errorMessage, 'error', 'Booking system not available. Please try again later.');
+        setButtonLoading(submitButton, false);
       }
     });
   }

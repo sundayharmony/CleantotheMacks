@@ -1,5 +1,12 @@
 // Authentication + data access using Supabase
 
+const ALLOWED_ROLES = ['user', 'member', 'host', 'admin'];
+
+function normalizeRole(role) {
+  if (ALLOWED_ROLES.includes(role)) return role;
+  return 'user';
+}
+
 function mapBookingFromDb(row) {
   if (!row) return null;
   return {
@@ -94,7 +101,7 @@ async function ensureProfile(user, roleOverride = null, nameOverride = null) {
     id: user.id,
     email: user.email,
     name: nameOverride || user.user_metadata?.name || null,
-    role: roleOverride || 'user'
+    role: normalizeRole(roleOverride || 'user')
   };
 
   const { data, error } = await supabase
@@ -113,6 +120,7 @@ async function ensureProfile(user, roleOverride = null, nameOverride = null) {
 // Create a new user
 async function createUser(name, email, password, role = null) {
   const supabase = getSupabaseClient();
+  const normalizedRole = normalizeRole(role || 'user');
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
@@ -124,14 +132,14 @@ async function createUser(name, email, password, role = null) {
   }
 
   if (data?.user) {
-    await ensureProfile(data.user, role || 'user', name);
+    await ensureProfile(data.user, normalizedRole, name);
   }
 
   return {
     id: data?.user?.id || null,
     name: name,
     email: email,
-    role: role || 'user'
+    role: normalizedRole
   };
 }
 
@@ -152,7 +160,7 @@ async function authenticateUser(email, password) {
     id: data.user.id,
     name: profile?.name || data.user.user_metadata?.name || '',
     email: data.user.email,
-    role: profile?.role || 'user',
+    role: normalizeRole(profile?.role || 'user'),
     createdAt: profile?.created_at || null
   };
 }
@@ -168,7 +176,7 @@ async function getCurrentUser() {
     id: data.user.id,
     name: profile?.name || data.user.user_metadata?.name || '',
     email: data.user.email,
-    role: profile?.role || 'user',
+    role: normalizeRole(profile?.role || 'user'),
     createdAt: profile?.created_at || null
   };
 }
@@ -313,13 +321,13 @@ async function getAllUsers() {
 
 // Update user role
 async function updateUserRole(userId, newRole) {
-  if (newRole !== 'user' && newRole !== 'admin') {
-    throw new Error('Invalid role. Must be "user" or "admin"');
+  if (!ALLOWED_ROLES.includes(newRole) || newRole === 'guest') {
+    throw new Error('Invalid role. Must be "user", "member", "host", or "admin".');
   }
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from('profiles')
-    .update({ role: newRole })
+    .update({ role: normalizeRole(newRole) })
     .eq('id', userId)
     .select('id, role, name, email, created_at')
     .single();
