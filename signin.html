@@ -71,9 +71,6 @@
                     <button id="signin-tab" class="flex-1 py-2 text-center font-semibold border-b-2 border-blue-600 text-blue-600">
                         Sign In
                     </button>
-                    <button id="signup-tab" class="flex-1 py-2 text-center font-semibold border-b-2 border-transparent text-gray-500 hover:text-blue-600">
-                        Create Account
-                    </button>
                 </div>
 
                 <div id="signin-panel">
@@ -115,80 +112,8 @@
                         </button>
                     </form>
                     <div class="mt-4 text-center text-sm text-gray-500">
-                        Don't have an account?
-                        <button id="show-signup" type="button" class="text-blue-600 hover:underline">
-                            Create one
-                        </button>
+                        New account creation is disabled for now.
                     </div>
-                </div>
-
-                <div id="signup-panel" class="hidden">
-                    <div id="signup-message" class="hidden bg-red-100 border border-red-400 text-red-800 px-4 py-3 rounded-lg mb-6"></div>
-
-                    <!-- Sign Up Form -->
-                    <form id="signup-form" class="space-y-4">
-                        <div>
-                            <label for="signup-name" class="block text-sm font-medium text-gray-700 mb-2">
-                                Full Name
-                            </label>
-                            <input
-                                type="text"
-                                id="signup-name"
-                                name="name"
-                                autocomplete="name"
-                                required
-                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
-                            />
-                        </div>
-                        <div>
-                            <label for="signup-email" class="block text-sm font-medium text-gray-700 mb-2">
-                                Email
-                            </label>
-                            <input
-                                type="email"
-                                id="signup-email"
-                                name="email"
-                                autocomplete="email"
-                                required
-                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
-                            />
-                        </div>
-                        <div>
-                            <label for="signup-password" class="block text-sm font-medium text-gray-700 mb-2">
-                                Password
-                            </label>
-                            <input
-                                type="password"
-                                id="signup-password"
-                                name="password"
-                                autocomplete="new-password"
-                                required
-                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
-                            />
-                        </div>
-                        <div>
-                            <label for="signup-confirm-password" class="block text-sm font-medium text-gray-700 mb-2">
-                                Confirm Password
-                            </label>
-                            <input
-                                type="password"
-                                id="signup-confirm-password"
-                                name="confirmPassword"
-                                autocomplete="new-password"
-                                required
-                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
-                            />
-                        </div>
-                        <button
-                            type="submit"
-                            class="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition"
-                        >
-                            Create Account
-                        </button>
-                    </form>
-                    <p class="mt-4 text-center text-sm text-gray-500">
-                        After signup, check your email for confirmation before signing in.
-                    </p>
                 </div>
 
                 <div class="mt-6 text-center">
@@ -247,12 +172,7 @@
     <script src="js/utils.js"></script>
     <script src="js/main.js"></script>
     <script>
-        const signinTab = document.getElementById('signin-tab');
-        const signupTab = document.getElementById('signup-tab');
-        const signinPanel = document.getElementById('signin-panel');
-        const signupPanel = document.getElementById('signup-panel');
         const signinMessage = document.getElementById('signin-message');
-        const signupMessage = document.getElementById('signup-message');
 
         const setMessage = (el, type, text) => {
             if (!el) return;
@@ -264,26 +184,6 @@
                 el.classList.add('bg-red-100', 'border', 'border-red-400', 'text-red-800');
             }
         };
-
-        const setActiveTab = (tab) => {
-            const isSignin = tab === 'signin';
-            signinTab.classList.toggle('border-blue-600', isSignin);
-            signinTab.classList.toggle('text-blue-600', isSignin);
-            signinTab.classList.toggle('border-transparent', !isSignin);
-            signinTab.classList.toggle('text-gray-500', !isSignin);
-
-            signupTab.classList.toggle('border-blue-600', !isSignin);
-            signupTab.classList.toggle('text-blue-600', !isSignin);
-            signupTab.classList.toggle('border-transparent', isSignin);
-            signupTab.classList.toggle('text-gray-500', isSignin);
-
-            signinPanel.classList.toggle('hidden', !isSignin);
-            signupPanel.classList.toggle('hidden', isSignin);
-        };
-
-        signinTab?.addEventListener('click', () => setActiveTab('signin'));
-        signupTab?.addEventListener('click', () => setActiveTab('signup'));
-        document.getElementById('show-signup')?.addEventListener('click', () => setActiveTab('signup'));
 
         // Handle sign in form submission
         document.getElementById('signin-form')?.addEventListener('submit', async function(e) {
@@ -322,47 +222,6 @@
             }
         });
 
-        // Handle sign up form submission
-        document.getElementById('signup-form')?.addEventListener('submit', async function(e) {
-            e.preventDefault();
-
-            if (signupMessage) signupMessage.classList.add('hidden');
-
-            const name = document.getElementById('signup-name').value.trim();
-            const email = document.getElementById('signup-email').value.trim();
-            const password = document.getElementById('signup-password').value;
-            const confirmPassword = document.getElementById('signup-confirm-password').value;
-            const submitButton = this.querySelector('button[type="submit"]');
-
-            if (!name || !email || !password || !confirmPassword) {
-                setMessage(signupMessage, 'error', 'Please complete all fields.');
-                return;
-            }
-
-            if (password !== confirmPassword) {
-                setMessage(signupMessage, 'error', 'Passwords do not match.');
-                return;
-            }
-
-            if (typeof isValidEmail === 'function' && !isValidEmail(email)) {
-                setMessage(signupMessage, 'error', 'Please enter a valid email address.');
-                return;
-            }
-
-            setButtonLoading(submitButton, true, 'Creating Account...');
-
-            try {
-                await createUser(name, email, password);
-                setMessage(signupMessage, 'success', 'Account created. Check your email to confirm, then sign in.');
-                setActiveTab('signin');
-                document.getElementById('signin-email').value = email;
-                document.getElementById('signin-password').focus();
-            } catch (error) {
-                setMessage(signupMessage, 'error', error.message || 'Unable to create account.');
-            } finally {
-                setButtonLoading(submitButton, false);
-            }
-        });
     </script>
 </body>
 </html>
