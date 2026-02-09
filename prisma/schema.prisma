@@ -12,7 +12,11 @@ model Booking {
   createdAt DateTime @default(now())
   name      String
   email     String
+  phone     String?
   address   String
+  sqft      String?
   homeSize  String
   notes     String?
+
+  status    String   @default("NEW")
 }
