@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 export default function OurWorkPage() {
   return (
     <>
@@ -30,9 +32,27 @@ export default function OurWorkPage() {
               },
             ].map((item) => (
               <div key={item.title} className="card">
-                <div className="before-after" style={{ marginBottom: 14 }}>
-                  <img src={item.before} alt={`${item.title} before`} />
-                  <img className="after" src={item.after} alt={`${item.title} after`} />
+                <div
+                  className="before-after"
+                  style={{ marginBottom: 14, position: "relative" }}
+                >
+                  <Image
+                    src={item.before}
+                    alt={`${item.title} before`}
+                    fill
+                    style={{ objectFit: "cover" }}
+                    sizes="(max-width: 900px) 100vw, 50vw"
+                    priority={false}
+                  />
+                  <Image
+                    src={item.after}
+                    alt={`${item.title} after`}
+                    fill
+                    style={{ objectFit: "cover" }}
+                    className="after"
+                    sizes="(max-width: 900px) 100vw, 50vw"
+                    priority={false}
+                  />
                 </div>
                 <strong>{item.title}</strong>
               </div>

@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 export default function AboutPage() {
   return (
     <>
@@ -39,10 +41,22 @@ export default function AboutPage() {
           </div>
           <div className="grid grid-2">
             <div className="image-card" style={{ minHeight: 220 }}>
-              <img src="/about-1.jpg" alt="Clean living space" />
+              <Image
+                src="/about-1.jpg"
+                alt="Clean living space"
+                width={800}
+                height={420}
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              />
             </div>
             <div className="image-card" style={{ minHeight: 220 }}>
-              <img src="/about-2.jpg" alt="Bright kitchen" />
+              <Image
+                src="/about-2.jpg"
+                alt="Bright kitchen"
+                width={800}
+                height={420}
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              />
             </div>
           </div>
         </div>

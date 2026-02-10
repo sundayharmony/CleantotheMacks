@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 export default function Home() {
   const services = [
     {
@@ -68,7 +70,14 @@ export default function Home() {
             </div>
           </div>
           <div className="image-card" style={{ minHeight: 360 }}>
-            <img src="/hero.jpg" alt="Clean living room" />
+            <Image
+              src="/hero.jpg"
+              alt="Clean living room"
+              width={1200}
+              height={800}
+              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              priority
+            />
           </div>
         </div>
       </section>

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
@@ -44,7 +45,14 @@ export default function RootLayout({
               href="/"
               style={{ display: "flex", alignItems: "center", gap: 12 }}
             >
-              <img src="/logo.png" alt="Clean to the Macks" width={132} />
+              <Image
+                src="/logo.png"
+                alt="Clean to the Macks"
+                width={132}
+                height={80}
+                style={{ height: "auto" }}
+                priority
+              />
             </Link>
             <nav className="nav">
               <Link href="/">Home</Link>
