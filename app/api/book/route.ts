@@ -57,7 +57,8 @@ export async function POST(request: Request) {
 
 export async function GET() {
   // Simple auth: require admin_session cookie to exist
-  const session = cookies().get("admin_session")?.value;
+  const cookieStore = await cookies();
+  const session = cookieStore.get("admin_session")?.value;
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
