@@ -70,8 +70,10 @@ export default function AdminPage() {
       // 2) [...]
       const list: Booking[] = Array.isArray(data) ? data : (data.bookings ?? []);
       setRows(list);
-    } catch (e: any) {
-      setErr(e?.message || "Failed to load");
+    } catch (e: unknown) {
+      const message =
+        e instanceof Error ? e.message : "Failed to load";
+      setErr(message);
     } finally {
       setLoading(false);
     }
@@ -126,10 +128,12 @@ export default function AdminPage() {
         body: JSON.stringify({ id, status: next }),
       });
       if (!res.ok) throw new Error(`Update failed (${res.status})`);
-    } catch (e: any) {
+    } catch (e: unknown) {
       // rollback on failure by reloading from server (simplest + safest)
       await load();
-      alert(e?.message || "Failed to update status");
+      const message =
+        e instanceof Error ? e.message : "Failed to update status";
+      alert(message);
     }
   }
 
@@ -212,7 +216,9 @@ export default function AdminPage() {
 
         <select
           value={filter}
-          onChange={(e) => setFilter(e.target.value as any)}
+          onChange={(e) =>
+            setFilter(e.target.value as "ALL" | BookingStatus)
+          }
           style={{
             padding: "10px 12px",
             borderRadius: 10,
