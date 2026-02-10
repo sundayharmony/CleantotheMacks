@@ -21,7 +21,7 @@ export default function BookPage() {
       phone: formData.get("phone"),
       address: formData.get("address"),
       homeSize: formData.get("homeSize"),
-      squareFeet: formData.get("squareFeet"),
+      sqft: formData.get("sqft"),
       notes: formData.get("notes"),
     };
 
@@ -137,7 +137,7 @@ export default function BookPage() {
                   Square Feet *
                   <input
                     className="input"
-                    name="squareFeet"
+                    name="sqft"
                     required
                     placeholder="e.g. 1800"
                   />
