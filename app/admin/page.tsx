@@ -17,12 +17,57 @@ type Booking = {
   status: BookingStatus | null;
 };
 
+type BookingDraft = {
+  name: string;
+  email: string;
+  phone: string;
+  address: string;
+  homeSize: string;
+  sqFt: string;
+  notes: string;
+  status: BookingStatus;
+};
+
 function formatDate(d: string) {
   try {
     return new Date(d).toLocaleString();
   } catch {
     return d;
   }
+}
+
+function normalizeBooking(raw: unknown): Booking {
+  const item = (raw ?? {}) as Record<string, unknown>;
+  const status =
+    item.status === "CONFIRMED" || item.status === "COMPLETED" || item.status === "NEW"
+      ? (item.status as BookingStatus)
+      : "NEW";
+
+  return {
+    id: String(item.id ?? ""),
+    createdAt: String(item.createdAt ?? ""),
+    name: String(item.name ?? ""),
+    email: String(item.email ?? ""),
+    phone: typeof item.phone === "string" ? item.phone : null,
+    address: String(item.address ?? ""),
+    sqFt: typeof item.sqFt === "string" ? item.sqFt : typeof item.sqft === "string" ? item.sqft : null,
+    homeSize: String(item.homeSize ?? ""),
+    notes: typeof item.notes === "string" ? item.notes : null,
+    status,
+  };
+}
+
+function toDraft(b: Booking): BookingDraft {
+  return {
+    name: b.name,
+    email: b.email,
+    phone: b.phone ?? "",
+    address: b.address,
+    homeSize: b.homeSize,
+    sqFt: b.sqFt ?? "",
+    notes: b.notes ?? "",
+    status: (b.status ?? "NEW") as BookingStatus,
+  };
 }
 
 function statusBadgeStyle(status: BookingStatus) {
@@ -55,6 +100,10 @@ export default function AdminPage() {
 
   const [filter, setFilter] = useState<"ALL" | BookingStatus>("ALL");
   const [q, setQ] = useState("");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<BookingDraft | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -68,7 +117,8 @@ export default function AdminPage() {
       // Support both shapes:
       // 1) { bookings: [...] }
       // 2) [...]
-      const list: Booking[] = Array.isArray(data) ? data : (data.bookings ?? []);
+      const rawList = Array.isArray(data) ? data : (data.bookings ?? []);
+      const list = rawList.map(normalizeBooking);
       setRows(list);
     } catch (e: unknown) {
       const message =
@@ -110,6 +160,29 @@ export default function AdminPage() {
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }, [rows, filter, q]);
 
+  const selectedBooking = useMemo(
+    () => (selectedId ? rows.find((r) => r.id === selectedId) ?? null : null),
+    [rows, selectedId]
+  );
+
+  function openBooking(b: Booking) {
+    setSelectedId(b.id);
+    setDraft(toDraft(b));
+  }
+
+  function closeModal() {
+    if (saving || deleting) return;
+    setSelectedId(null);
+    setDraft(null);
+  }
+
+  function updateLocalRow(updated: Booking) {
+    setRows((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
+    if (selectedId === updated.id) {
+      setDraft(toDraft(updated));
+    }
+  }
+
   async function updateStatus(id: string, next: BookingStatus) {
     if (!id) {
       alert("Missing booking id. Please refresh.");
@@ -128,12 +201,72 @@ export default function AdminPage() {
         body: JSON.stringify({ id, status: next }),
       });
       if (!res.ok) throw new Error(`Update failed (${res.status})`);
+      const data = (await res.json()) as { booking?: unknown };
+      if (data.booking) {
+        updateLocalRow(normalizeBooking(data.booking));
+      }
     } catch (e: unknown) {
       // rollback on failure by reloading from server (simplest + safest)
       await load();
       const message =
         e instanceof Error ? e.message : "Failed to update status";
       alert(message);
+    }
+  }
+
+  async function saveBooking() {
+    if (!selectedBooking || !draft) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/book/${selectedBooking.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: selectedBooking.id,
+          name: draft.name,
+          email: draft.email,
+          phone: draft.phone,
+          address: draft.address,
+          homeSize: draft.homeSize,
+          sqft: draft.sqFt,
+          notes: draft.notes,
+          status: draft.status,
+        }),
+      });
+      if (!res.ok) throw new Error(`Save failed (${res.status})`);
+      const data = (await res.json()) as { booking?: unknown };
+      if (data.booking) {
+        updateLocalRow(normalizeBooking(data.booking));
+      } else {
+        await load();
+      }
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Failed to save booking";
+      alert(message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function deleteBooking() {
+    if (!selectedBooking) return;
+    const ok = window.confirm(`Delete booking for ${selectedBooking.name}?`);
+    if (!ok) return;
+
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/book/${selectedBooking.id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error(`Delete failed (${res.status})`);
+      setRows((prev) => prev.filter((r) => r.id !== selectedBooking.id));
+      setSelectedId(null);
+      setDraft(null);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Failed to delete booking";
+      alert(message);
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -246,8 +379,20 @@ export default function AdminPage() {
       ) : filtered.length === 0 ? (
         <p style={{ marginTop: 18, opacity: 0.75 }}>No bookings found.</p>
       ) : (
-        <div style={{ marginTop: 18 }}>
+        <div className="admin-table-wrap" style={{ marginTop: 18 }}>
           <table className="admin-table" style={{ width: "100%", borderCollapse: "collapse" }}>
+            <colgroup>
+              <col style={{ width: "11%" }} />
+              <col style={{ width: "11%" }} />
+              <col style={{ width: "13%" }} />
+              <col style={{ width: "10%" }} />
+              <col style={{ width: "17%" }} />
+              <col style={{ width: "8%" }} />
+              <col style={{ width: "8%" }} />
+              <col style={{ width: "13%" }} />
+              <col style={{ width: "9%" }} />
+              <col style={{ width: "10%" }} />
+            </colgroup>
             <thead>
               <tr style={{ textAlign: "left", opacity: 0.85 }}>
                 <th style={{ padding: "10px 8px", borderBottom: "1px solid #222" }}>Date</th>
@@ -255,9 +400,9 @@ export default function AdminPage() {
                 <th style={{ padding: "10px 8px", borderBottom: "1px solid #222" }}>Email</th>
                 <th style={{ padding: "10px 8px", borderBottom: "1px solid #222" }}>Phone</th>
                 <th style={{ padding: "10px 8px", borderBottom: "1px solid #222" }}>Address</th>
-                <th style={{ padding: "10px 8px", borderBottom: "1px solid #222" }}>Sq Ft</th>
+                <th style={{ padding: "10px 8px", borderBottom: "1px solid #222", whiteSpace: "nowrap" }}>Sq Ft</th>
                 <th style={{ padding: "10px 8px", borderBottom: "1px solid #222" }}>Bedrooms</th>
-                <th style={{ padding: "10px 8px", borderBottom: "1px solid #222" }}>Status</th>
+                <th style={{ padding: "10px 8px", borderBottom: "1px solid #222", whiteSpace: "nowrap" }}>Status</th>
                 <th style={{ padding: "10px 8px", borderBottom: "1px solid #222" }}>Notes</th>
                 <th style={{ padding: "10px 8px", borderBottom: "1px solid #222" }}>Actions</th>
               </tr>
@@ -271,7 +416,19 @@ export default function AdminPage() {
                 const maps = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(b.address)}`;
 
                 return (
-                  <tr key={b.id} style={{ borderBottom: "1px solid #151515" }}>
+                  <tr
+                    key={b.id}
+                    style={{ borderBottom: "1px solid #151515", cursor: "pointer" }}
+                    onClick={() => openBooking(b)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        openBooking(b);
+                      }
+                    }}
+                  >
                     <td style={{ padding: "10px 8px", whiteSpace: "nowrap" }}>{formatDate(b.createdAt)}</td>
                     <td style={{ padding: "10px 8px" }}>{b.name}</td>
                     <td style={{ padding: "10px 8px" }}>
@@ -290,11 +447,13 @@ export default function AdminPage() {
                       )}
                     </td>
                     <td style={{ padding: "10px 8px" }}>{b.address}</td>
-                    <td style={{ padding: "10px 8px" }}>{b.sqFt ?? <span style={{ opacity: 0.6 }}>—</span>}</td>
+                    <td style={{ padding: "10px 8px", whiteSpace: "nowrap" }}>
+                      {b.sqFt ?? <span style={{ opacity: 0.6 }}>—</span>}
+                    </td>
                     <td style={{ padding: "10px 8px" }}>{b.homeSize}</td>
 
-                    <td style={{ padding: "10px 8px" }}>
-                      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <td style={{ padding: "10px 8px", whiteSpace: "nowrap" }}>
+                      <div style={{ display: "flex", gap: 8, alignItems: "center", whiteSpace: "nowrap" }}>
                         <span
                           style={{
                             fontSize: 12,
@@ -308,6 +467,7 @@ export default function AdminPage() {
 
                         <select
                           value={status}
+                          onClick={(e) => e.stopPropagation()}
                           onChange={(e) => updateStatus(b.id, e.target.value as BookingStatus)}
                           style={{
                             padding: "6px 8px",
@@ -316,6 +476,7 @@ export default function AdminPage() {
                             background: "var(--color-surface)",
                             color: "var(--color-text)",
                             outline: "none",
+                            minWidth: 132,
                           }}
                           aria-label="Change status"
                         >
@@ -335,6 +496,7 @@ export default function AdminPage() {
                     <td style={{ padding: "10px 8px", whiteSpace: "nowrap" }}>
                       <a
                         href={maps}
+                        onClick={(e) => e.stopPropagation()}
                         target="_blank"
                         rel="noreferrer"
                         style={{
@@ -352,6 +514,7 @@ export default function AdminPage() {
 
                       <a
                         href={mailto}
+                        onClick={(e) => e.stopPropagation()}
                         style={{
                           display: "inline-block",
                           padding: "6px 10px",
@@ -371,6 +534,138 @@ export default function AdminPage() {
           </table>
         </div>
       )}
+
+      {selectedBooking && draft ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={closeModal}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(2, 6, 23, 0.72)",
+            display: "grid",
+            placeItems: "center",
+            padding: 16,
+            zIndex: 1000,
+          }}
+        >
+          <div
+            className="card"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "min(920px, 96vw)",
+              maxHeight: "88vh",
+              overflowY: "auto",
+              display: "grid",
+              gap: 14,
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "start" }}>
+              <div>
+                <h2 style={{ margin: 0, fontSize: 26 }}>Booking Details</h2>
+                <p style={{ marginTop: 6, opacity: 0.75 }}>
+                  Created: {formatDate(selectedBooking.createdAt)}
+                </p>
+              </div>
+              <button className="btn btn-outline" onClick={closeModal} disabled={saving || deleting}>
+                Close
+              </button>
+            </div>
+
+            <div className="grid grid-2">
+              <label>
+                Name
+                <input
+                  className="input"
+                  value={draft.name}
+                  onChange={(e) => setDraft((prev) => (prev ? { ...prev, name: e.target.value } : prev))}
+                />
+              </label>
+              <label>
+                Email
+                <input
+                  className="input"
+                  type="email"
+                  value={draft.email}
+                  onChange={(e) => setDraft((prev) => (prev ? { ...prev, email: e.target.value } : prev))}
+                />
+              </label>
+              <label>
+                Phone
+                <input
+                  className="input"
+                  value={draft.phone}
+                  onChange={(e) => setDraft((prev) => (prev ? { ...prev, phone: e.target.value } : prev))}
+                />
+              </label>
+              <label>
+                Bedrooms
+                <input
+                  className="input"
+                  value={draft.homeSize}
+                  onChange={(e) => setDraft((prev) => (prev ? { ...prev, homeSize: e.target.value } : prev))}
+                />
+              </label>
+              <label>
+                Sq Ft
+                <input
+                  className="input"
+                  value={draft.sqFt}
+                  onChange={(e) => setDraft((prev) => (prev ? { ...prev, sqFt: e.target.value } : prev))}
+                />
+              </label>
+              <label>
+                Status
+                <select
+                  className="input"
+                  value={draft.status}
+                  onChange={(e) =>
+                    setDraft((prev) => (prev ? { ...prev, status: e.target.value as BookingStatus } : prev))
+                  }
+                >
+                  <option value="NEW">NEW</option>
+                  <option value="CONFIRMED">CONFIRMED</option>
+                  <option value="COMPLETED">COMPLETED</option>
+                </select>
+              </label>
+            </div>
+
+            <label>
+              Address
+              <input
+                className="input"
+                value={draft.address}
+                onChange={(e) => setDraft((prev) => (prev ? { ...prev, address: e.target.value } : prev))}
+              />
+            </label>
+
+            <label>
+              Notes
+              <textarea
+                className="input"
+                rows={4}
+                value={draft.notes}
+                onChange={(e) => setDraft((prev) => (prev ? { ...prev, notes: e.target.value } : prev))}
+              />
+            </label>
+
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+              <button
+                className="btn btn-outline"
+                onClick={deleteBooking}
+                disabled={saving || deleting}
+                style={{ borderColor: "rgba(239,68,68,0.5)", color: "#fca5a5" }}
+              >
+                {deleting ? "Deleting..." : "Delete Booking"}
+              </button>
+              <button className="btn btn-primary" onClick={saveBooking} disabled={saving || deleting}>
+                {saving ? "Saving..." : "Save Changes"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       </div>
     </section>
   );

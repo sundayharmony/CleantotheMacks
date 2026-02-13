@@ -47,7 +47,7 @@ img {
 }
 
 .container-wide {
-  width: min(1400px, 96vw);
+  width: min(1680px, 98vw);
 }
 
 .section {
@@ -162,13 +162,14 @@ tr:last-child td {
 }
 
 .admin-table {
-  table-layout: auto;
+  table-layout: fixed;
 }
 
 .admin-table th,
 .admin-table td {
   white-space: normal;
-  word-break: break-word;
+  word-break: normal;
+  overflow-wrap: anywhere;
   vertical-align: top;
 }
 
@@ -179,7 +180,22 @@ tr:last-child td {
 
 .admin-table td:last-child,
 .admin-table th:last-child {
-  width: 140px;
+  width: 180px;
+}
+
+.admin-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.admin-table th:nth-child(6),
+.admin-table td:nth-child(6) {
+  white-space: nowrap;
+}
+
+.admin-table th:nth-child(8),
+.admin-table td:nth-child(8) {
+  white-space: nowrap;
 }
 
 .pill {

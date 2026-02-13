@@ -17,20 +17,70 @@ export async function PATCH(req: Request, context: any) {
         ? await rawParams
         : rawParams;
 
-    const body = (await req.json()) as { status?: string; id?: string };
+    const body = (await req.json()) as {
+      id?: string;
+      status?: string;
+      name?: string;
+      email?: string;
+      phone?: string;
+      address?: string;
+      homeSize?: string;
+      sqft?: string;
+      sqFt?: string;
+      notes?: string;
+    };
     const id = params?.id ?? body.id;
 
     if (!id) {
       return NextResponse.json({ error: "Missing id" }, { status: 400 });
     }
 
-    if (!body?.status) {
-      return NextResponse.json({ error: "Missing status" }, { status: 400 });
+    const data: {
+      status?: string;
+      name?: string;
+      email?: string;
+      phone?: string | null;
+      address?: string;
+      homeSize?: string;
+      sqft?: string | null;
+      notes?: string | null;
+    } = {};
+
+    if (typeof body.status === "string" && body.status.trim()) {
+      data.status = body.status.trim();
+    }
+    if (typeof body.name === "string" && body.name.trim()) {
+      data.name = body.name.trim();
+    }
+    if (typeof body.email === "string" && body.email.trim()) {
+      data.email = body.email.trim();
+    }
+    if (typeof body.phone === "string") {
+      const phone = body.phone.trim();
+      data.phone = phone || null;
+    }
+    if (typeof body.address === "string" && body.address.trim()) {
+      data.address = body.address.trim();
+    }
+    if (typeof body.homeSize === "string" && body.homeSize.trim()) {
+      data.homeSize = body.homeSize.trim();
+    }
+    if (typeof body.notes === "string") {
+      const notes = body.notes.trim();
+      data.notes = notes || null;
+    }
+    if (typeof body.sqft === "string" || typeof body.sqFt === "string") {
+      const sqft = (body.sqft ?? body.sqFt ?? "").trim();
+      data.sqft = sqft || null;
+    }
+
+    if (Object.keys(data).length === 0) {
+      return NextResponse.json({ error: "No fields to update" }, { status: 400 });
     }
 
     const updated = await prisma.booking.update({
       where: { id },
-      data: { status: body.status },
+      data,
     });
 
     return NextResponse.json({ success: true, booking: updated });
