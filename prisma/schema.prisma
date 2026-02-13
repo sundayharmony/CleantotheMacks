@@ -7,16 +7,93 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Booking {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  name      String
-  email     String
-  phone     String?
-  address   String
-  sqft      String?
-  homeSize  String
-  notes     String?
+model Client {
+  id                 String   @id @default(cuid())
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
-  status    String   @default("NEW")
+  name               String
+  email              String   @unique
+  phone              String?
+  address            String
+
+  preferredDay       String?
+  preferredTime      String?
+  specialInstructions String?
+  pets               String?
+  accessCodes        String?
+  communicationNotes String?
+  referralSource     String?
+
+  bookings           Booking[]
+  satisfactionNotes  SatisfactionNote[]
+}
+
+model Cleaner {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  name        String
+  email       String   @unique
+  phone       String
+  address     String?
+
+  paymentType String   @default("hourly")
+  hourlyRate  Float?
+
+  cleaningJobs CleaningJob[]
+}
+
+model Booking {
+  id            String   @id @default(cuid())
+  createdAt     DateTime @default(now())
+  name          String
+  email         String
+  phone         String?
+  address       String
+  sqft          String?
+  homeSize      String
+  notes         String?
+  status        String   @default("NEW")
+
+  scheduledDate DateTime?
+  serviceType   String?
+
+  clientId      String?
+  client        Client?  @relation(fields: [clientId], references: [id], onDelete: SetNull)
+
+  cleaningJob   CleaningJob?
+}
+
+model CleaningJob {
+  id              String    @id @default(cuid())
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  bookingId       String    @unique
+  booking         Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  cleanerId       String
+  cleaner         Cleaner   @relation(fields: [cleanerId], references: [id], onDelete: Restrict)
+
+  clockInTime     DateTime?
+  clockOutTime    DateTime?
+  flatRateAmount  Float?
+
+  status          String    @default("assigned")
+  completionNotes String?
+  totalPay        Float?
+}
+
+model SatisfactionNote {
+  id               String   @id @default(cuid())
+  createdAt        DateTime @default(now())
+
+  clientId         String
+  client           Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  rating           Int?
+  notes            String?
+  followUpRequired Boolean  @default(false)
 }

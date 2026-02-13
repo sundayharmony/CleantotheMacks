@@ -86,6 +86,12 @@ export async function GET() {
         homeSize: true,
         notes: true,
         status: true,
+        clientId: true,
+        scheduledDate: true,
+        serviceType: true,
+        cleaningJob: {
+          select: { id: true, cleanerId: true, status: true },
+        },
       },
     });
 

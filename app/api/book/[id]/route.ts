@@ -37,6 +37,9 @@ export async function PATCH(req: Request, context: any) {
       sqft?: string;
       sqFt?: string;
       notes?: string;
+      clientId?: string | null;
+      scheduledDate?: string | null;
+      serviceType?: string | null;
     };
     const id = params?.id ?? body.id;
 
@@ -53,6 +56,9 @@ export async function PATCH(req: Request, context: any) {
       homeSize?: string;
       sqft?: string | null;
       notes?: string | null;
+      clientId?: string | null;
+      scheduledDate?: Date | null;
+      serviceType?: string | null;
     } = {};
 
     if (typeof body.status === "string" && body.status.trim()) {
@@ -81,6 +87,15 @@ export async function PATCH(req: Request, context: any) {
     if (typeof body.sqft === "string" || typeof body.sqFt === "string") {
       const sqft = (body.sqft ?? body.sqFt ?? "").trim();
       data.sqft = sqft || null;
+    }
+    if (body.clientId !== undefined) {
+      data.clientId = body.clientId || null;
+    }
+    if (body.scheduledDate !== undefined) {
+      data.scheduledDate = body.scheduledDate ? new Date(body.scheduledDate) : null;
+    }
+    if (typeof body.serviceType === "string") {
+      data.serviceType = body.serviceType.trim() || null;
     }
 
     if (Object.keys(data).length === 0) {
