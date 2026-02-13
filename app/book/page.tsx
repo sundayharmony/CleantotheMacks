@@ -25,21 +25,27 @@ export default function BookPage() {
       notes: formData.get("notes"),
     };
 
-    const res = await fetch("/api/book", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+    try {
+      const res = await fetch("/api/book", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
 
-    if (!res.ok) {
-      setError("Something went wrong. Please try again.");
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        setError(data?.error || "Something went wrong. Please try again.");
+        setLoading(false);
+        return;
+      }
+
+      setSuccess(true);
+      form.reset();
+    } catch {
+      setError("Network error. Please check your connection and try again.");
+    } finally {
       setLoading(false);
-      return;
     }
-
-    setSuccess(true);
-    setLoading(false);
-    form.reset();
   }
 
   return (

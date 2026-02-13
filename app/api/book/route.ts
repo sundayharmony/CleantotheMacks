@@ -32,6 +32,15 @@ export async function POST(request: Request) {
     );
   }
 
+  // Basic email format validation
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return NextResponse.json(
+      { success: false, error: "Invalid email address" },
+      { status: 400 }
+    );
+  }
+
   try {
     const booking = await prisma.booking.create({
       data: {

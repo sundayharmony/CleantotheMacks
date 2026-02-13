@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { prisma } from "@/lib/db";
 
 export const runtime = "nodejs"; // ensure Prisma runs in Node (not Edge)
+
+async function requireAdmin() {
+  const cookieStore = await cookies();
+  return !!cookieStore.get("admin_session")?.value;
+}
 
 // NOTE: Use a permissive `context: any` param and defensively resolve params
 // because the build-time types in Vercel/Next can differ (sometimes params
@@ -10,6 +16,9 @@ export const runtime = "nodejs"; // ensure Prisma runs in Node (not Edge)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function PATCH(req: Request, context: any) {
   try {
+    if (!(await requireAdmin())) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     // defensive: support context.params being a Promise or a plain object
     const rawParams = context?.params;
     const params =
@@ -93,6 +102,9 @@ export async function PATCH(req: Request, context: any) {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function DELETE(_req: Request, context: any) {
   try {
+    if (!(await requireAdmin())) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     const rawParams = context?.params;
     const params =
       rawParams && typeof rawParams.then === "function"

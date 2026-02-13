@@ -17,6 +17,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Clean to the Macks",
   description: "Professional residential cleaning services.",
+  icons: {
+    icon: "/favicon.ico",
+  },
 };
 
 export default function RootLayout({
@@ -29,7 +32,7 @@ export default function RootLayout({
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
         <header
           style={{
-            background: "#ffffff",
+            background: "var(--color-surface)",
             borderBottom: "1px solid var(--color-border)",
           }}
         >
