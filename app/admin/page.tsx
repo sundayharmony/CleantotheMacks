@@ -186,6 +186,7 @@ export default function AdminPage() {
   const [cleaners, setCleaners] = useState<Cleaner[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
+  const [gallery, setGallery] = useState<GalleryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
