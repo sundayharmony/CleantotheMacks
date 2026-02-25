@@ -1254,6 +1254,21 @@ function TestimonialsTab({ testimonials, setTestimonials, reload }: {
     }
   }
 
+  async function seedTestimonials() {
+    try {
+      const res = await fetch("/api/testimonial/seed", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        alert(data.error || "Seed failed");
+        return;
+      }
+      alert(data.message);
+      await reload();
+    } catch {
+      alert("Seed failed");
+    }
+  }
+
   async function toggleVisibility(t: Testimonial) {
     try {
       const res = await fetch(`/api/testimonial/${t.id}`, {
