@@ -112,3 +112,26 @@ model Testimonial {
   visible   Boolean  @default(true)
   sortOrder Int      @default(0)
 }
+
+model GalleryItem {
+  id             String   @id @default(cuid())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  title          String
+  description    String?
+  beforeImageUrl String
+  afterImageUrl  String
+  visible        Boolean  @default(true)
+  sortOrder      Int      @default(0)
+}
+
+model ClientSession {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  token     String   @unique
+  clientId  String
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+}
