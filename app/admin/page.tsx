@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState, useCallback } from "react";
 
 type BookingStatus = "NEW" | "CONFIRMED" | "COMPLETED";
 type JobStatus = "assigned" | "in_progress" | "completed" | "cancelled";
-type Tab = "bookings" | "clients" | "cleaners" | "jobs";
+type Tab = "dashboard" | "bookings" | "clients" | "cleaners" | "jobs" | "testimonials";
 
 type Booking = {
   id: string;
@@ -100,6 +100,17 @@ type Job = {
   };
 };
 
+type Testimonial = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  name: string;
+  quote: string;
+  rating: number | null;
+  visible: boolean;
+  sortOrder: number;
+};
+
 /* ─── Helpers ─── */
 
 function fmt(d: string | null) {
@@ -155,13 +166,14 @@ function Modal({ open, onClose, children }: { open: boolean; onClose: () => void
 /* ─── MAIN COMPONENT ─── */
 
 export default function AdminPage() {
-  const [tab, setTab] = useState<Tab>("bookings");
+  const [tab, setTab] = useState<Tab>("dashboard");
 
   // Data
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [cleaners, setCleaners] = useState<Cleaner[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
@@ -169,18 +181,20 @@ export default function AdminPage() {
     setLoading(true);
     setErr(null);
     try {
-      const [bRes, cRes, clRes, jRes] = await Promise.all([
+      const [bRes, cRes, clRes, jRes, tRes] = await Promise.all([
         fetch("/api/book", { cache: "no-store" }),
         fetch("/api/client", { cache: "no-store" }),
         fetch("/api/cleaner", { cache: "no-store" }),
         fetch("/api/job", { cache: "no-store" }),
+        fetch("/api/testimonial?all=true", { cache: "no-store" }),
       ]);
       if (!bRes.ok || !cRes.ok || !clRes.ok || !jRes.ok) throw new Error("Failed to load data");
-      const [bData, cData, clData, jData] = await Promise.all([bRes.json(), cRes.json(), clRes.json(), jRes.json()]);
+      const [bData, cData, clData, jData, tData] = await Promise.all([bRes.json(), cRes.json(), clRes.json(), jRes.json(), tRes.ok ? tRes.json() : { testimonials: [] }]);
       setBookings(Array.isArray(bData) ? bData : bData.bookings ?? []);
       setClients(cData.clients ?? []);
       setCleaners(clData.cleaners ?? []);
       setJobs(jData.jobs ?? []);
+      setTestimonials(tData.testimonials ?? []);
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : "Failed to load");
     } finally {
@@ -211,9 +225,9 @@ export default function AdminPage() {
 
         {/* Tabs */}
         <div className="tab-nav">
-          {(["bookings", "clients", "cleaners", "jobs"] as Tab[]).map((t) => (
+          {(["dashboard", "bookings", "clients", "cleaners", "jobs", "testimonials"] as Tab[]).map((t) => (
             <button key={t} className={`tab-btn${tab === t ? " active" : ""}`} onClick={() => setTab(t)}>
-              {t === "bookings" ? "Bookings" : t === "clients" ? "Clients" : t === "cleaners" ? "Cleaners" : "Jobs"}
+              {t === "dashboard" ? "Dashboard" : t === "bookings" ? "Bookings" : t === "clients" ? "Clients" : t === "cleaners" ? "Cleaners" : t === "jobs" ? "Jobs" : "Testimonials"}
             </button>
           ))}
         </div>
@@ -224,10 +238,12 @@ export default function AdminPage() {
           <p style={{ color: "tomato" }}>{err}</p>
         ) : (
           <>
+            {tab === "dashboard" && <DashboardTab bookings={bookings} clients={clients} jobs={jobs} testimonials={testimonials} setTab={setTab} />}
             {tab === "bookings" && <BookingsTab bookings={bookings} setBookings={setBookings} cleaners={cleaners} clients={clients} reload={loadAll} />}
             {tab === "clients" && <ClientsTab clients={clients} setClients={setClients} reload={loadAll} />}
             {tab === "cleaners" && <CleanersTab cleaners={cleaners} setCleaners={setCleaners} reload={loadAll} />}
             {tab === "jobs" && <JobsTab jobs={jobs} setJobs={setJobs} bookings={bookings} cleaners={cleaners} reload={loadAll} />}
+            {tab === "testimonials" && <TestimonialsTab testimonials={testimonials} setTestimonials={setTestimonials} reload={loadAll} />}
           </>
         )}
       </div>
@@ -1063,6 +1079,286 @@ function JobsTab({ jobs, setJobs, bookings, cleaners, reload }: {
             </div>
           </>
         )}
+      </Modal>
+    </>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════
+   DASHBOARD TAB
+   ════════════════════════════════════════════════════════════════ */
+
+function DashboardTab({ bookings, clients, jobs, testimonials, setTab }: {
+  bookings: Booking[];
+  clients: Client[];
+  jobs: Job[];
+  testimonials: Testimonial[];
+  setTab: (t: Tab) => void;
+}) {
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const bookingsThisMonth = bookings.filter((b) => new Date(b.createdAt) >= monthStart).length;
+  const newBookings = bookings.filter((b) => b.status === "NEW").length;
+  const activeJobs = jobs.filter((j) => j.status === "assigned" || j.status === "in_progress").length;
+  const revenueThisMonth = jobs
+    .filter((j) => j.status === "completed" && new Date(j.createdAt) >= monthStart)
+    .reduce((sum, j) => sum + (j.totalPay ?? 0), 0);
+  const totalClients = clients.length;
+  const newClientsThisMonth = clients.filter((c) => new Date(c.createdAt) >= monthStart).length;
+  const visibleTestimonials = testimonials.filter((t) => t.visible).length;
+
+  // Recent activity — last 10 bookings
+  const recentBookings = [...bookings]
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, 8);
+
+  return (
+    <>
+      {/* Quick Actions */}
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20 }}>
+        <button className="btn btn-primary" onClick={() => setTab("bookings")} style={{ padding: "10px 18px", fontSize: 14 }}>View Bookings</button>
+        <button className="btn btn-outline" onClick={() => setTab("clients")} style={{ padding: "10px 18px", fontSize: 14 }}>Manage Clients</button>
+        <button className="btn btn-outline" onClick={() => setTab("testimonials")} style={{ padding: "10px 18px", fontSize: 14 }}>Manage Testimonials</button>
+      </div>
+
+      {/* Stats Grid */}
+      <div className="stat-row" style={{ marginBottom: 24 }}>
+        <div className="stat-card"><strong>{bookingsThisMonth}</strong><small>Bookings This Month</small></div>
+        <div className="stat-card"><strong>{newBookings}</strong><small>New / Pending</small></div>
+        <div className="stat-card"><strong>{activeJobs}</strong><small>Active Jobs</small></div>
+        <div className="stat-card"><strong>${revenueThisMonth.toFixed(2)}</strong><small>Revenue This Month</small></div>
+        <div className="stat-card"><strong>{totalClients}</strong><small>Total Clients</small></div>
+        <div className="stat-card"><strong>{newClientsThisMonth}</strong><small>New Clients This Month</small></div>
+        <div className="stat-card"><strong>{visibleTestimonials}/{testimonials.length}</strong><small>Testimonials Visible</small></div>
+      </div>
+
+      {/* Recent Activity */}
+      <h3 style={{ fontSize: 18, marginBottom: 12 }}>Recent Bookings</h3>
+      {recentBookings.length === 0 ? (
+        <p style={{ opacity: 0.75 }}>No recent bookings.</p>
+      ) : (
+        <div style={{ display: "grid", gap: 8 }}>
+          {recentBookings.map((b) => (
+            <div key={b.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: 12, fontSize: 14 }}>
+              <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+                <span style={{ fontWeight: 600 }}>{b.name}</span>
+                <span style={{ color: "var(--color-muted)" }}>{b.address}</span>
+              </div>
+              <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                <span style={{ color: "var(--color-muted)", fontSize: 13 }}>{fmtDate(b.createdAt)}</span>
+                <span style={pillStyle(b.status)}>{b.status}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════
+   TESTIMONIALS TAB
+   ════════════════════════════════════════════════════════════════ */
+
+function TestimonialsTab({ testimonials, setTestimonials, reload }: {
+  testimonials: Testimonial[];
+  setTestimonials: React.Dispatch<React.SetStateAction<Testimonial[]>>;
+  reload: () => Promise<void>;
+}) {
+  const [q, setQ] = useState("");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [draft, setDraft] = useState<Record<string, string | boolean>>({});
+
+  const filtered = useMemo(() => {
+    const query = q.trim().toLowerCase();
+    return testimonials.filter((t) => {
+      if (!query) return true;
+      return [t.name, t.quote].join(" ").toLowerCase().includes(query);
+    });
+  }, [testimonials, q]);
+
+  const selected = selectedId ? testimonials.find((t) => t.id === selectedId) ?? null : null;
+
+  function openTestimonial(t: Testimonial) {
+    setCreating(false);
+    setSelectedId(t.id);
+    setDraft({
+      name: t.name,
+      quote: t.quote,
+      rating: t.rating?.toString() ?? "",
+      visible: t.visible,
+      sortOrder: t.sortOrder.toString(),
+    });
+  }
+
+  function startCreate() {
+    setSelectedId(null);
+    setCreating(true);
+    setDraft({ name: "", quote: "", rating: "", visible: true, sortOrder: "0" });
+  }
+
+  function close() {
+    if (!saving) { setSelectedId(null); setCreating(false); }
+  }
+
+  async function save() {
+    setSaving(true);
+    try {
+      const payload = {
+        name: draft.name,
+        quote: draft.quote,
+        rating: draft.rating ? parseInt(draft.rating as string, 10) : null,
+        visible: draft.visible,
+        sortOrder: draft.sortOrder ? parseInt(draft.sortOrder as string, 10) : 0,
+      };
+
+      if (creating) {
+        const res = await fetch("/api/testimonial", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) {
+          const d = await res.json().catch(() => null);
+          throw new Error(d?.error || "Create failed");
+        }
+      } else if (selected) {
+        const res = await fetch(`/api/testimonial/${selected.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) throw new Error("Save failed");
+      }
+      await reload();
+      setSelectedId(null);
+      setCreating(false);
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : "Save failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function deleteTestimonial() {
+    if (!selected || !window.confirm(`Delete testimonial from ${selected.name}?`)) return;
+    try {
+      await fetch(`/api/testimonial/${selected.id}`, { method: "DELETE" });
+      setTestimonials((prev) => prev.filter((t) => t.id !== selected.id));
+      setSelectedId(null);
+    } catch {
+      alert("Delete failed");
+    }
+  }
+
+  async function toggleVisibility(t: Testimonial) {
+    try {
+      const res = await fetch(`/api/testimonial/${t.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ visible: !t.visible }),
+      });
+      if (!res.ok) throw new Error("Toggle failed");
+      await reload();
+    } catch {
+      alert("Failed to toggle visibility");
+    }
+  }
+
+  const visibleCount = testimonials.filter((t) => t.visible).length;
+
+  return (
+    <>
+      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 16 }}>
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search testimonials…"
+          style={{ width: 300, maxWidth: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid var(--color-border)", background: "var(--color-surface)", color: "var(--color-text)", outline: "none" }} />
+        <button className="btn btn-primary" onClick={startCreate} style={{ padding: "10px 16px", fontSize: 14 }}>+ Add Testimonial</button>
+        <span style={{ opacity: 0.75, fontSize: 14 }}>{visibleCount} visible / {testimonials.length} total</span>
+      </div>
+
+      {filtered.length === 0 ? <p style={{ opacity: 0.75 }}>No testimonials found.</p> : (
+        <div className="admin-table-wrap">
+          <table className="admin-table">
+            <thead>
+              <tr><th>Order</th><th>Name</th><th>Quote</th><th>Rating</th><th>Visible</th><th>Actions</th></tr>
+            </thead>
+            <tbody>
+              {filtered.map((t) => (
+                <tr key={t.id} style={{ cursor: "pointer" }} onClick={() => openTestimonial(t)}>
+                  <td>{t.sortOrder}</td>
+                  <td style={{ fontWeight: 600 }}>{t.name}</td>
+                  <td style={{ color: "var(--color-muted)", maxWidth: 400 }}>
+                    {t.quote.length > 80 ? t.quote.slice(0, 80) + "…" : t.quote}
+                  </td>
+                  <td>{t.rating ? "★".repeat(t.rating) + "☆".repeat(5 - t.rating) : <span style={{ opacity: 0.5 }}>—</span>}</td>
+                  <td>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); toggleVisibility(t); }}
+                      style={{
+                        padding: "4px 10px", borderRadius: 999, fontSize: 12, fontWeight: 600, cursor: "pointer", border: "1px solid",
+                        ...(t.visible
+                          ? { borderColor: "rgba(34,197,94,0.4)", color: "#86efac", background: "rgba(34,197,94,0.12)" }
+                          : { borderColor: "var(--color-border)", color: "var(--color-muted)", background: "rgba(255,255,255,0.06)" }),
+                      }}
+                    >
+                      {t.visible ? "Visible" : "Hidden"}
+                    </button>
+                  </td>
+                  <td>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); openTestimonial(t); }}
+                      style={{ padding: "4px 10px", borderRadius: 8, border: "1px solid var(--color-border)", color: "var(--color-text)", background: "transparent", cursor: "pointer", fontSize: 13 }}
+                    >
+                      Edit
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <Modal open={!!selected || creating} onClose={close}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", gap: 16 }}>
+          <h2 style={{ margin: 0, fontSize: 24 }}>{creating ? "New Testimonial" : "Edit Testimonial"}</h2>
+          <button className="btn btn-outline" onClick={close} style={{ padding: "6px 14px", fontSize: 13 }}>Close</button>
+        </div>
+
+        <div className="grid grid-2">
+          <label>Name *<input className="input" value={(draft.name as string) ?? ""} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="e.g. Ashley R." /></label>
+          <label>Rating
+            <select className="input" value={(draft.rating as string) ?? ""} onChange={(e) => setDraft({ ...draft, rating: e.target.value })}>
+              <option value="">No rating</option>
+              <option value="5">★★★★★ (5)</option>
+              <option value="4">★★★★☆ (4)</option>
+              <option value="3">★★★☆☆ (3)</option>
+              <option value="2">★★☆☆☆ (2)</option>
+              <option value="1">★☆☆☆☆ (1)</option>
+            </select>
+          </label>
+        </div>
+
+        <label>Quote *<textarea className="input" rows={4} value={(draft.quote as string) ?? ""} onChange={(e) => setDraft({ ...draft, quote: e.target.value })} placeholder="What did the customer say?" /></label>
+
+        <div className="grid grid-2">
+          <label>Sort Order
+            <input className="input" type="number" min="0" value={(draft.sortOrder as string) ?? "0"} onChange={(e) => setDraft({ ...draft, sortOrder: e.target.value })} />
+          </label>
+          <label style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 12, cursor: "pointer" }}>
+            <input type="checkbox" checked={draft.visible as boolean} onChange={(e) => setDraft({ ...draft, visible: e.target.checked })}
+              style={{ width: 20, height: 20, accentColor: "var(--color-primary)" }} />
+            <span>Visible on website</span>
+          </label>
+        </div>
+
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+          {!creating && <button className="btn btn-outline" onClick={deleteTestimonial} disabled={saving} style={{ borderColor: "rgba(239,68,68,0.5)", color: "#fca5a5" }}>Delete Testimonial</button>}
+          <button className="btn btn-primary" onClick={save} disabled={saving} style={{ marginLeft: "auto" }}>{saving ? "Saving…" : creating ? "Add Testimonial" : "Save Changes"}</button>
+        </div>
       </Modal>
     </>
   );

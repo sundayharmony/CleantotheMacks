@@ -97,3 +97,15 @@ model SatisfactionNote {
   notes            String?
   followUpRequired Boolean  @default(false)
 }
+
+model Testimonial {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  name      String
+  quote     String
+  rating    Int?
+  visible   Boolean  @default(true)
+  sortOrder Int      @default(0)
+}

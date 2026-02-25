@@ -1,6 +1,35 @@
 import Image from "next/image";
 
-export default function Home() {
+type Testimonial = {
+  id: string;
+  name: string;
+  quote: string;
+  rating: number | null;
+};
+
+const fallbackTestimonials: Testimonial[] = [
+  { id: "1", name: "Ashley R.", quote: "Every visit feels like a reset. Easy booking and great attention to detail.", rating: 5 },
+  { id: "2", name: "Jordan L.", quote: "Professional, on time, and my home has never looked better.", rating: 5 },
+  { id: "3", name: "Priya S.", quote: "Friendly crew and consistent quality. The best cleaning service we've used.", rating: 5 },
+];
+
+async function getTestimonials(): Promise<Testimonial[]> {
+  try {
+    const baseUrl = process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+    const res = await fetch(`${baseUrl}/api/testimonial`, {
+      next: { revalidate: 60 },
+    });
+    if (!res.ok) return fallbackTestimonials;
+    const data = await res.json();
+    return data.testimonials?.length > 0 ? data.testimonials : fallbackTestimonials;
+  } catch {
+    return fallbackTestimonials;
+  }
+}
+
+export default async function Home() {
   const services = [
     {
       title: "Standard Cleaning",
@@ -16,20 +45,7 @@ export default function Home() {
     },
   ];
 
-  const testimonials = [
-    {
-      name: "Ashley R.",
-      quote: "Every visit feels like a reset. Easy booking and great attention to detail.",
-    },
-    {
-      name: "Jordan L.",
-      quote: "Professional, on time, and my home has never looked better.",
-    },
-    {
-      name: "Priya S.",
-      quote: "Friendly crew and consistent quality. The best cleaning service we’ve used.",
-    },
-  ];
+  const testimonials = await getTestimonials();
 
   return (
     <>
@@ -59,7 +75,7 @@ export default function Home() {
                   <span style={{ color: "var(--color-muted)" }}>Homes refreshed</span>
                 </div>
                 <div className="stat">
-                  <strong>4.9★</strong>
+                  <strong>4.9&#9733;</strong>
                   <span style={{ color: "var(--color-muted)" }}>Client rating</span>
                 </div>
                 <div className="stat">
@@ -108,9 +124,14 @@ export default function Home() {
           </p>
           <div className="grid grid-3" style={{ marginTop: 24 }}>
             {testimonials.map((item) => (
-              <div key={item.name} className="card">
+              <div key={item.id} className="card">
+                {item.rating && (
+                  <div style={{ marginBottom: 8, color: "#fbbf24" }}>
+                    {"\u2605".repeat(item.rating)}{"\u2606".repeat(5 - item.rating)}
+                  </div>
+                )}
                 <p style={{ marginBottom: 16, color: "var(--color-muted)" }}>
-                  “{item.quote}”
+                  &ldquo;{item.quote}&rdquo;
                 </p>
                 <strong>{item.name}</strong>
               </div>
@@ -123,7 +144,7 @@ export default function Home() {
         <div className="container" style={{ textAlign: "center" }}>
           <h2 className="section-title">Ready to book your clean?</h2>
           <p className="section-subtitle" style={{ margin: "0 auto 24px" }}>
-            Tell us about your home and we’ll take care of the rest.
+            Tell us about your home and we&apos;ll take care of the rest.
           </p>
           <a className="btn btn-primary" href="/book">
             Book Now
