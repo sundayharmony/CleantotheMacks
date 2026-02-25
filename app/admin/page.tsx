@@ -205,12 +205,13 @@ export default function AdminPage() {
         }
       };
 
-      const [bData, cData, clData, jData, tData] = await Promise.all([
+      const [bData, cData, clData, jData, tData, gData] = await Promise.all([
         safeFetch("/api/book"),
         safeFetch("/api/client"),
         safeFetch("/api/cleaner"),
         safeFetch("/api/job"),
         safeFetch("/api/testimonial?all=true"),
+        safeFetch("/api/gallery?all=true"),
       ]);
 
       // Only show error if ALL core routes failed
@@ -223,6 +224,7 @@ export default function AdminPage() {
       setCleaners(clData?.cleaners ?? []);
       setJobs(jData?.jobs ?? []);
       setTestimonials(tData?.testimonials ?? []);
+      setGallery(gData?.gallery ?? []);
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : "Failed to load");
     } finally {
