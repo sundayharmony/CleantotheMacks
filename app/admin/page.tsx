@@ -255,9 +255,9 @@ export default function AdminPage() {
 
         {/* Tabs */}
         <div className="tab-nav">
-          {(["dashboard", "bookings", "clients", "cleaners", "jobs", "testimonials"] as Tab[]).map((t) => (
+          {(["dashboard", "bookings", "clients", "cleaners", "jobs", "testimonials", "gallery"] as Tab[]).map((t) => (
             <button key={t} className={`tab-btn${tab === t ? " active" : ""}`} onClick={() => setTab(t)}>
-              {t === "dashboard" ? "Dashboard" : t === "bookings" ? "Bookings" : t === "clients" ? "Clients" : t === "cleaners" ? "Cleaners" : t === "jobs" ? "Jobs" : "Testimonials"}
+              {t === "dashboard" ? "Dashboard" : t === "bookings" ? "Bookings" : t === "clients" ? "Clients" : t === "cleaners" ? "Cleaners" : t === "jobs" ? "Jobs" : t === "testimonials" ? "Testimonials" : "Gallery"}
             </button>
           ))}
         </div>
