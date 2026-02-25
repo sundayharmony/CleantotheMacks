@@ -1412,3 +1412,180 @@ function TestimonialsTab({ testimonials, setTestimonials, reload }: {
     </>
   );
 }
+
+/* ════════════════════════════════════════════════════════════════
+   GALLERY TAB
+   ════════════════════════════════════════════════════════════════ */
+
+function GalleryTab({ gallery, setGallery, reload }: {
+  gallery: GalleryItem[];
+  setGallery: React.Dispatch<React.SetStateAction<GalleryItem[]>>;
+  reload: () => Promise<void>;
+}) {
+  const [q, setQ] = useState("");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [draft, setDraft] = useState<Record<string, string | boolean>>({});
+
+  const filtered = useMemo(() => {
+    const query = q.trim().toLowerCase();
+    return gallery.filter((g) => {
+      if (!query) return true;
+      return [g.title, g.description ?? ""].join(" ").toLowerCase().includes(query);
+    });
+  }, [gallery, q]);
+
+  const selected = selectedId ? gallery.find((g) => g.id === selectedId) ?? null : null;
+
+  function openItem(g: GalleryItem) {
+    setCreating(false);
+    setSelectedId(g.id);
+    setDraft({
+      title: g.title, description: g.description ?? "",
+      beforeImageUrl: g.beforeImageUrl, afterImageUrl: g.afterImageUrl,
+      visible: g.visible, sortOrder: g.sortOrder.toString(),
+    });
+  }
+
+  function startCreate() {
+    setSelectedId(null);
+    setCreating(true);
+    setDraft({ title: "", description: "", beforeImageUrl: "", afterImageUrl: "", visible: true, sortOrder: "0" });
+  }
+
+  function close() { if (!saving) { setSelectedId(null); setCreating(false); } }
+
+  async function save() {
+    setSaving(true);
+    try {
+      const payload = {
+        title: draft.title, description: draft.description,
+        beforeImageUrl: draft.beforeImageUrl, afterImageUrl: draft.afterImageUrl,
+        visible: draft.visible, sortOrder: draft.sortOrder ? parseInt(draft.sortOrder as string, 10) : 0,
+      };
+      if (creating) {
+        const res = await fetch("/api/gallery", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+        if (!res.ok) { const d = await res.json().catch(() => null); throw new Error(d?.error || "Create failed"); }
+      } else if (selected) {
+        const res = await fetch(`/api/gallery/${selected.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+        if (!res.ok) throw new Error("Save failed");
+      }
+      await reload();
+      setSelectedId(null);
+      setCreating(false);
+    } catch (e: unknown) { alert(e instanceof Error ? e.message : "Save failed"); }
+    finally { setSaving(false); }
+  }
+
+  async function deleteItem() {
+    if (!selected || !window.confirm(`Delete "${selected.title}"?`)) return;
+    try {
+      await fetch(`/api/gallery/${selected.id}`, { method: "DELETE" });
+      setGallery((prev) => prev.filter((g) => g.id !== selected.id));
+      setSelectedId(null);
+    } catch { alert("Delete failed"); }
+  }
+
+  async function toggleVisibility(g: GalleryItem) {
+    try {
+      const res = await fetch(`/api/gallery/${g.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ visible: !g.visible }),
+      });
+      if (!res.ok) throw new Error("Toggle failed");
+      await reload();
+    } catch { alert("Failed to toggle visibility"); }
+  }
+
+  const visibleCount = gallery.filter((g) => g.visible).length;
+
+  return (
+    <>
+      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 16 }}>
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search gallery..."
+          style={{ width: 300, maxWidth: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid var(--color-border)", background: "var(--color-surface)", color: "var(--color-text)", outline: "none" }} />
+        <button className="btn btn-primary" onClick={startCreate} style={{ padding: "10px 16px", fontSize: 14 }}>+ Add Before/After</button>
+        <span style={{ opacity: 0.75, fontSize: 14 }}>{visibleCount} visible / {gallery.length} total</span>
+      </div>
+
+      {filtered.length === 0 ? <p style={{ opacity: 0.75 }}>No gallery items found. Add your first before/after photo pair above.</p> : (
+        <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))" }}>
+          {filtered.map((g) => (
+            <div key={g.id} className="card" style={{ cursor: "pointer", opacity: g.visible ? 1 : 0.5 }} onClick={() => openItem(g)}>
+              <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+                <div style={{ flex: 1, borderRadius: 8, overflow: "hidden", height: 120, background: "var(--color-surface-2)", position: "relative" }}>
+                  <span style={{ position: "absolute", top: 4, left: 4, background: "rgba(0,0,0,0.6)", color: "#fff", fontSize: 10, padding: "2px 6px", borderRadius: 4, zIndex: 1 }}>BEFORE</span>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={g.beforeImageUrl} alt="Before" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                </div>
+                <div style={{ flex: 1, borderRadius: 8, overflow: "hidden", height: 120, background: "var(--color-surface-2)", position: "relative" }}>
+                  <span style={{ position: "absolute", top: 4, left: 4, background: "rgba(34,197,94,0.7)", color: "#fff", fontSize: 10, padding: "2px 6px", borderRadius: 4, zIndex: 1 }}>AFTER</span>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={g.afterImageUrl} alt="After" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                </div>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <strong>{g.title}</strong>
+                  {g.description && <p style={{ fontSize: 13, color: "var(--color-muted)", marginTop: 4 }}>{g.description}</p>}
+                </div>
+                <button onClick={(e) => { e.stopPropagation(); toggleVisibility(g); }}
+                  style={{ padding: "4px 10px", borderRadius: 999, fontSize: 12, fontWeight: 600, cursor: "pointer", border: "1px solid",
+                    ...(g.visible ? { borderColor: "rgba(34,197,94,0.4)", color: "#86efac", background: "rgba(34,197,94,0.12)" }
+                      : { borderColor: "var(--color-border)", color: "var(--color-muted)", background: "rgba(255,255,255,0.06)" }) }}>
+                  {g.visible ? "Visible" : "Hidden"}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <Modal open={!!selected || creating} onClose={close}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", gap: 16 }}>
+          <h2 style={{ margin: 0, fontSize: 24 }}>{creating ? "New Gallery Item" : "Edit Gallery Item"}</h2>
+          <button className="btn btn-outline" onClick={close} style={{ padding: "6px 14px", fontSize: 13 }}>Close</button>
+        </div>
+
+        <label>Title *<input className="input" value={(draft.title as string) ?? ""} onChange={(e) => setDraft({ ...draft, title: e.target.value })} placeholder="e.g. Living Room Reset" /></label>
+        <label>Description<textarea className="input" rows={2} value={(draft.description as string) ?? ""} onChange={(e) => setDraft({ ...draft, description: e.target.value })} placeholder="Optional description" /></label>
+
+        <div className="grid grid-2">
+          <label>Before Image URL *<input className="input" value={(draft.beforeImageUrl as string) ?? ""} onChange={(e) => setDraft({ ...draft, beforeImageUrl: e.target.value })} placeholder="https://..." /></label>
+          <label>After Image URL *<input className="input" value={(draft.afterImageUrl as string) ?? ""} onChange={(e) => setDraft({ ...draft, afterImageUrl: e.target.value })} placeholder="https://..." /></label>
+        </div>
+
+        {((draft.beforeImageUrl as string) || (draft.afterImageUrl as string)) && (
+          <div style={{ display: "flex", gap: 8 }}>
+            {(draft.beforeImageUrl as string) && (
+              <div style={{ flex: 1, borderRadius: 8, overflow: "hidden", height: 140, background: "var(--color-surface-2)" }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={draft.beforeImageUrl as string} alt="Before preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              </div>
+            )}
+            {(draft.afterImageUrl as string) && (
+              <div style={{ flex: 1, borderRadius: 8, overflow: "hidden", height: 140, background: "var(--color-surface-2)" }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={draft.afterImageUrl as string} alt="After preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="grid grid-2">
+          <label>Sort Order<input className="input" type="number" min="0" value={(draft.sortOrder as string) ?? "0"} onChange={(e) => setDraft({ ...draft, sortOrder: e.target.value })} /></label>
+          <label style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 12, cursor: "pointer" }}>
+            <input type="checkbox" checked={draft.visible as boolean} onChange={(e) => setDraft({ ...draft, visible: e.target.checked })} style={{ width: 20, height: 20, accentColor: "var(--color-primary)" }} />
+            <span>Visible on website</span>
+          </label>
+        </div>
+
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+          {!creating && <button className="btn btn-outline" onClick={deleteItem} disabled={saving} style={{ borderColor: "rgba(239,68,68,0.5)", color: "#fca5a5" }}>Delete Item</button>}
+          <button className="btn btn-primary" onClick={save} disabled={saving} style={{ marginLeft: "auto" }}>{saving ? "Saving..." : creating ? "Add Item" : "Save Changes"}</button>
+        </div>
+      </Modal>
+    </>
+  );
+}
