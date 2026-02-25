@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState, useCallback } from "react";
 
 type BookingStatus = "NEW" | "CONFIRMED" | "COMPLETED";
 type JobStatus = "assigned" | "in_progress" | "completed" | "cancelled";
-type Tab = "dashboard" | "bookings" | "clients" | "cleaners" | "jobs" | "testimonials";
+type Tab = "dashboard" | "bookings" | "clients" | "cleaners" | "jobs" | "testimonials" | "gallery";
 
 type Booking = {
   id: string;
