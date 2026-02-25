@@ -15,6 +15,21 @@ export async function POST() {
   }
 
   try {
+    // Check if table exists
+    const tableCheck = await prisma.$queryRaw<{ exists: boolean }[]>`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables
+        WHERE table_schema = 'public'
+        AND table_name = 'Testimonial'
+      ) as exists
+    `;
+    if (!tableCheck[0]?.exists) {
+      return NextResponse.json({
+        success: false,
+        error: "Testimonial table does not exist yet. Run 'npx prisma db push' locally first.",
+      }, { status: 503 });
+    }
+
     // Check if testimonials already exist
     const existing = await prisma.testimonial.count();
     if (existing > 0) {
@@ -58,7 +73,7 @@ export async function POST() {
   } catch (err) {
     console.error("POST /api/testimonial/seed failed:", err);
     return NextResponse.json(
-      { success: false, error: "Failed to seed testimonials" },
+      { success: false, error: "Failed to seed testimonials. Make sure the table exists by running 'npx prisma db push'." },
       { status: 500 }
     );
   }
