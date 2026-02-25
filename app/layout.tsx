@@ -61,6 +61,8 @@ export default function RootLayout({
               <Link href="/">Home</Link>
               <Link href="/about">About</Link>
               <Link href="/our-work">Our Work</Link>
+              <Link href="/service-area">Service Area</Link>
+              <Link href="/portal">Client Portal</Link>
             </nav>
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
               <Link className="btn btn-primary" href="/book">
