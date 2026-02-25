@@ -274,6 +274,7 @@ export default function AdminPage() {
             {tab === "cleaners" && <CleanersTab cleaners={cleaners} setCleaners={setCleaners} reload={loadAll} />}
             {tab === "jobs" && <JobsTab jobs={jobs} setJobs={setJobs} bookings={bookings} cleaners={cleaners} reload={loadAll} />}
             {tab === "testimonials" && <TestimonialsTab testimonials={testimonials} setTestimonials={setTestimonials} reload={loadAll} />}
+            {tab === "gallery" && <GalleryTab gallery={gallery} setGallery={setGallery} reload={loadAll} />}
           </>
         )}
       </div>
