@@ -17,6 +17,8 @@ model Client {
   phone              String?
   address            String
 
+  passwordHash       String?
+
   preferredDay       String?
   preferredTime      String?
   specialInstructions String?
@@ -27,6 +29,7 @@ model Client {
 
   bookings           Booking[]
   satisfactionNotes  SatisfactionNote[]
+  sessions           ClientSession[]
 }
 
 model Cleaner {
