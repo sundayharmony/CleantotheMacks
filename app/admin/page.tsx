@@ -181,20 +181,35 @@ export default function AdminPage() {
     setLoading(true);
     setErr(null);
     try {
-      const [bRes, cRes, clRes, jRes, tRes] = await Promise.all([
-        fetch("/api/book", { cache: "no-store" }),
-        fetch("/api/client", { cache: "no-store" }),
-        fetch("/api/cleaner", { cache: "no-store" }),
-        fetch("/api/job", { cache: "no-store" }),
-        fetch("/api/testimonial?all=true", { cache: "no-store" }),
+      // Fetch each resource independently so one failure doesn't break everything
+      const safeFetch = async (url: string) => {
+        try {
+          const res = await fetch(url, { cache: "no-store" });
+          if (!res.ok) return null;
+          return await res.json();
+        } catch {
+          return null;
+        }
+      };
+
+      const [bData, cData, clData, jData, tData] = await Promise.all([
+        safeFetch("/api/book"),
+        safeFetch("/api/client"),
+        safeFetch("/api/cleaner"),
+        safeFetch("/api/job"),
+        safeFetch("/api/testimonial?all=true"),
       ]);
-      if (!bRes.ok || !cRes.ok || !clRes.ok || !jRes.ok) throw new Error("Failed to load data");
-      const [bData, cData, clData, jData, tData] = await Promise.all([bRes.json(), cRes.json(), clRes.json(), jRes.json(), tRes.ok ? tRes.json() : { testimonials: [] }]);
-      setBookings(Array.isArray(bData) ? bData : bData.bookings ?? []);
-      setClients(cData.clients ?? []);
-      setCleaners(clData.cleaners ?? []);
-      setJobs(jData.jobs ?? []);
-      setTestimonials(tData.testimonials ?? []);
+
+      // Only show error if ALL core routes failed
+      if (!bData && !cData && !clData && !jData) {
+        throw new Error("Failed to load data — check your connection or login status");
+      }
+
+      setBookings(bData ? (Array.isArray(bData) ? bData : bData.bookings ?? []) : []);
+      setClients(cData?.clients ?? []);
+      setCleaners(clData?.cleaners ?? []);
+      setJobs(jData?.jobs ?? []);
+      setTestimonials(tData?.testimonials ?? []);
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : "Failed to load");
     } finally {
