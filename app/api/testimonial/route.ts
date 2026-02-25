@@ -10,8 +10,29 @@ async function isAdmin() {
   return !!cookieStore.get("admin_session")?.value;
 }
 
+async function tableExists(): Promise<boolean> {
+  try {
+    const result = await prisma.$queryRaw<{ exists: boolean }[]>`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables
+        WHERE table_schema = 'public'
+        AND table_name = 'Testimonial'
+      ) as exists
+    `;
+    return result[0]?.exists === true;
+  } catch {
+    return false;
+  }
+}
+
 export async function GET(request: Request) {
   try {
+    // Check if table exists first to avoid crashing
+    const exists = await tableExists();
+    if (!exists) {
+      return NextResponse.json({ testimonials: [] });
+    }
+
     const { searchParams } = new URL(request.url);
     const all = searchParams.get("all") === "true";
 
@@ -35,7 +56,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ testimonials });
   } catch (err) {
     console.error("GET /api/testimonial failed:", err);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+    // Return empty array instead of 500 to avoid breaking the dashboard
+    return NextResponse.json({ testimonials: [] });
   }
 }
 
@@ -45,6 +67,14 @@ export async function POST(request: Request) {
   }
 
   try {
+    const exists = await tableExists();
+    if (!exists) {
+      return NextResponse.json(
+        { success: false, error: "Testimonial table not found. Run 'npx prisma db push' to create it." },
+        { status: 503 }
+      );
+    }
+
     const body = await request.json();
     const name = body.name?.trim();
     const quote = body.quote?.trim();
