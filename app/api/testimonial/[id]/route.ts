@@ -60,7 +60,10 @@ export async function PATCH(req: Request, context: any) {
     return NextResponse.json({ success: true, testimonial });
   } catch (err) {
     console.error("PATCH /api/testimonial/[id] failed:", err);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    const msg = err instanceof Error && err.message.includes("does not exist")
+      ? "Testimonial table not found. Run 'npx prisma db push' to create it."
+      : "Internal Server Error";
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
 
@@ -86,6 +89,9 @@ export async function DELETE(_req: Request, context: any) {
     return NextResponse.json({ success: true });
   } catch (err) {
     console.error("DELETE /api/testimonial/[id] failed:", err);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    const msg = err instanceof Error && err.message.includes("does not exist")
+      ? "Testimonial table not found. Run 'npx prisma db push' to create it."
+      : "Internal Server Error";
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
