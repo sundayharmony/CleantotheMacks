@@ -111,6 +111,18 @@ type Testimonial = {
   sortOrder: number;
 };
 
+type GalleryItem = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  title: string;
+  description: string | null;
+  beforeImageUrl: string;
+  afterImageUrl: string;
+  visible: boolean;
+  sortOrder: number;
+};
+
 /* ─── Helpers ─── */
 
 function fmt(d: string | null) {
