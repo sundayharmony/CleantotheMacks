@@ -1291,6 +1291,9 @@ function TestimonialsTab({ testimonials, setTestimonials, reload }: {
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search testimonials…"
           style={{ width: 300, maxWidth: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid var(--color-border)", background: "var(--color-surface)", color: "var(--color-text)", outline: "none" }} />
         <button className="btn btn-primary" onClick={startCreate} style={{ padding: "10px 16px", fontSize: 14 }}>+ Add Testimonial</button>
+        {testimonials.length === 0 && (
+          <button className="btn btn-outline" onClick={seedTestimonials} style={{ padding: "10px 16px", fontSize: 14, borderColor: "rgba(88,166,255,0.5)", color: "var(--color-secondary)" }}>Seed Default Testimonials</button>
+        )}
         <span style={{ opacity: 0.75, fontSize: 14 }}>{visibleCount} visible / {testimonials.length} total</span>
       </div>
 
