@@ -47,10 +47,10 @@ fi
 # HTTP checks
 info "Quick HTTP check (may time out if DNS/SSL not ready)..."
 echo "  HEAD https://${DOMAIN_ROOT}"
-curl -I -sS --max-time 10 "https://${DOMAIN_ROOT}" | sed -n '1,6p' || echo "  <no response>"
+curl -I -sS --max-time 180 "https://${DOMAIN_ROOT}" | sed -n '1,6p' || echo "  <no response>"
 echo
 echo "  HEAD https://${WWW_DOMAIN}"
-curl -I -sS --max-time 10 "https://${WWW_DOMAIN}" | sed -n '1,6p' || echo "  <no response>"
+curl -I -sS --max-time 180 "https://${WWW_DOMAIN}" | sed -n '1,6p' || echo "  <no response>"
 
 # Vercel API helpers (if token provided)
 ve_api(){
