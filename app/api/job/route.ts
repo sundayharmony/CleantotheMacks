@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/db";
+import { notifyJobAssigned } from "@/lib/email";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -85,10 +86,20 @@ export async function POST(request: Request) {
         status: "assigned",
       },
       include: {
-        booking: { select: { id: true, name: true, address: true } },
-        cleaner: { select: { id: true, name: true, paymentType: true, hourlyRate: true } },
+        booking: { select: { id: true, name: true, address: true, homeSize: true, scheduledDate: true } },
+        cleaner: { select: { id: true, name: true, email: true, paymentType: true, hourlyRate: true } },
       },
     });
+
+    // Notify cleaner of new assignment (fire-and-forget)
+    notifyJobAssigned({
+      cleanerName: job.cleaner.name,
+      cleanerEmail: job.cleaner.email,
+      clientName: job.booking.name,
+      address: job.booking.address,
+      homeSize: job.booking.homeSize,
+      date: job.booking.scheduledDate?.toString() || null,
+    }).catch(() => {});
 
     return NextResponse.json({ success: true, job });
   } catch (err) {

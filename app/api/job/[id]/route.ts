@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/db";
+import { notifyJobCompleted, notifyAdminJobCompleted } from "@/lib/email";
 
 export const runtime = "nodejs";
 
@@ -81,16 +82,33 @@ export async function PATCH(req: Request, context: any) {
       return NextResponse.json({ error: "No fields to update" }, { status: 400 });
     }
 
-    const job = await prisma.cleaningJob.update({
+    const updated = await prisma.cleaningJob.update({
       where: { id },
       data,
       include: {
-        booking: { select: { id: true, name: true, address: true } },
+        booking: { select: { id: true, name: true, address: true, email: true } },
         cleaner: { select: { id: true, name: true, paymentType: true, hourlyRate: true } },
       },
     });
 
-    return NextResponse.json({ success: true, job });
+    // Send notifications when job is completed
+    if (data.status === "completed" || body.clockOut === true) {
+      notifyJobCompleted({
+        clientName: updated.booking.name,
+        clientEmail: updated.booking.email,
+        address: updated.booking.address,
+        completionNotes: updated.completionNotes,
+      }).catch(() => {});
+
+      notifyAdminJobCompleted({
+        cleanerName: updated.cleaner.name,
+        clientName: updated.booking.name,
+        address: updated.booking.address,
+        totalPay: updated.totalPay,
+      }).catch(() => {});
+    }
+
+    return NextResponse.json({ success: true, job: updated });
   } catch (err) {
     console.error("PATCH /api/job/[id] failed:", err);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });

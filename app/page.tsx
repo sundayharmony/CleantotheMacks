@@ -1,4 +1,7 @@
 import Image from "next/image";
+import { prisma } from "@/lib/db";
+
+export const dynamic = "force-dynamic";
 
 type Testimonial = {
   id: string;
@@ -15,15 +18,20 @@ const fallbackTestimonials: Testimonial[] = [
 
 async function getTestimonials(): Promise<Testimonial[]> {
   try {
-    const baseUrl = process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
-    const res = await fetch(`${baseUrl}/api/testimonial`, {
-      next: { revalidate: 60 },
+    const result = await prisma.$queryRaw<{ exists: boolean }[]>`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'Testimonial'
+      ) as exists
+    `;
+    if (!result[0]?.exists) return fallbackTestimonials;
+
+    const testimonials = await prisma.testimonial.findMany({
+      where: { visible: true },
+      orderBy: { sortOrder: "asc" },
+      select: { id: true, name: true, quote: true, rating: true },
     });
-    if (!res.ok) return fallbackTestimonials;
-    const data = await res.json();
-    return data.testimonials?.length > 0 ? data.testimonials : fallbackTestimonials;
+    return testimonials.length > 0 ? testimonials : fallbackTestimonials;
   } catch {
     return fallbackTestimonials;
   }

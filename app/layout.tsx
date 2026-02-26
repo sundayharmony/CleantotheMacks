@@ -93,9 +93,14 @@ export default function RootLayout({
           >
             <span>Clean to the Macks</span>
             <span>Reliable residential cleaning in your area.</span>
-            <Link href="/admin" style={{ color: "var(--color-muted)" }}>
-              Admin
-            </Link>
+            <div style={{ display: "flex", gap: 16 }}>
+              <Link href="/cleaner" style={{ color: "var(--color-muted)" }}>
+                Cleaner Portal
+              </Link>
+              <Link href="/admin" style={{ color: "var(--color-muted)" }}>
+                Admin
+              </Link>
+            </div>
           </div>
         </footer>
       </body>

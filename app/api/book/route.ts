@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/db";
+import { notifyNewBooking } from "@/lib/email";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -53,6 +54,15 @@ export async function POST(request: Request) {
         notes: notes || null,
       },
     });
+
+    // Send email notifications (fire-and-forget)
+    notifyNewBooking({
+      name,
+      email,
+      address,
+      homeSize,
+      notes,
+    }).catch(() => {});
 
     return NextResponse.json({ success: true, id: booking.id });
   } catch (err) {

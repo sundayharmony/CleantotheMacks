@@ -33,19 +33,31 @@ model Client {
 }
 
 model Cleaner {
-  id          String   @id @default(cuid())
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String   @id @default(cuid())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  name        String
-  email       String   @unique
-  phone       String
-  address     String?
+  name         String
+  email        String   @unique
+  phone        String
+  address      String?
+  passwordHash String?
 
-  paymentType String   @default("hourly")
-  hourlyRate  Float?
+  paymentType  String   @default("hourly")
+  hourlyRate   Float?
 
-  cleaningJobs CleaningJob[]
+  cleaningJobs    CleaningJob[]
+  cleanerSessions CleanerSession[]
+}
+
+model CleanerSession {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  token     String   @unique
+  cleanerId String
+  cleaner   Cleaner  @relation(fields: [cleanerId], references: [id], onDelete: Cascade)
 }
 
 model Booking {

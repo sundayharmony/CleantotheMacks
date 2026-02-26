@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import crypto from "crypto";
+import { notifyClientRegistered } from "@/lib/email";
 
 export const runtime = "nodejs";
 
@@ -61,6 +62,9 @@ export async function POST(request: Request) {
     await prisma.clientSession.create({
       data: { token, clientId: client.id, expiresAt },
     });
+
+    // Send welcome email (fire-and-forget)
+    notifyClientRegistered({ name: client.name, email: client.email }).catch(() => {});
 
     const res = NextResponse.json({ success: true });
     res.cookies.set("client_session", token, {
