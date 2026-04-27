@@ -6,7 +6,7 @@ import Link from "next/link";
 // Service area data
 const SERVICE_AREAS = [
   {
-    name: "South Jersey",
+    name: "South Jersey Counties",
     areas: [
       "Atlantic County",
       "Camden County",
@@ -135,10 +135,16 @@ export default function ServiceAreaPage() {
     <>
       <section className="section">
         <div className="container">
-          <h1 style={{ fontSize: 40, marginBottom: 12 }}>Service Area</h1>
+          <h1 style={{ fontSize: 40, marginBottom: 12 }}>
+            Service Area - South Jersey, Atlantic County and Nearby
+          </h1>
           <p className="section-subtitle">
             We proudly serve homes across South Jersey (including Atlantic County
             and surrounding counties), Central Jersey, and the Philadelphia metro area.
+          </p>
+          <p style={{ color: "var(--color-muted)" }}>
+            Core South Jersey coverage includes Atlantic, Camden, Burlington,
+            Gloucester, Cape May, Cumberland, and Salem counties.
           </p>
         </div>
       </section>
