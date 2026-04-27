@@ -205,14 +205,13 @@ export default function AdminPage() {
         }
       };
 
-      const [bData, cData, clData, jData, tData, gData] = await Promise.all([
-        safeFetch("/api/book"),
-        safeFetch("/api/client"),
-        safeFetch("/api/cleaner"),
-        safeFetch("/api/job"),
-        safeFetch("/api/testimonial?all=true"),
-        safeFetch("/api/gallery?all=true"),
-      ]);
+      // Run requests sequentially to avoid connection spikes on pooled DBs.
+      const bData = await safeFetch("/api/book");
+      const cData = await safeFetch("/api/client");
+      const clData = await safeFetch("/api/cleaner");
+      const jData = await safeFetch("/api/job");
+      const tData = await safeFetch("/api/testimonial?all=true");
+      const gData = await safeFetch("/api/gallery?all=true");
 
       // Only show error if ALL core routes failed
       if (!bData && !cData && !clData && !jData) {
@@ -424,11 +423,32 @@ function BookingsTab({ bookings, setBookings, cleaners, clients, reload }: {
                     <td><span style={pillStyle(b.status)}>{b.status}</span></td>
                     <td>{assignedCleaner || <span style={{ opacity: 0.5 }}>Unassigned</span>}</td>
                     <td>
-                      <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(b.address)}`}
-                        onClick={(e) => e.stopPropagation()} target="_blank" rel="noreferrer"
-                        style={{ display: "inline-block", padding: "4px 10px", borderRadius: 8, border: "1px solid var(--color-border)", color: "var(--color-text)", textDecoration: "none", fontSize: 13 }}>
-                        Map
-                      </a>
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(b.address)}`}
+                          onClick={(e) => e.stopPropagation()} target="_blank" rel="noreferrer"
+                          style={{ display: "inline-block", padding: "4px 10px", borderRadius: 8, border: "1px solid var(--color-border)", color: "var(--color-text)", textDecoration: "none", fontSize: 13 }}>
+                          Map
+                        </a>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            sendVideoRelease(b);
+                          }}
+                          disabled={sendingRelease}
+                          style={{
+                            display: "inline-block",
+                            padding: "4px 10px",
+                            borderRadius: 8,
+                            border: "1px solid var(--color-border)",
+                            color: "var(--color-text)",
+                            background: "transparent",
+                            fontSize: 13,
+                            cursor: sendingRelease ? "wait" : "pointer",
+                          }}
+                        >
+                          {sendingRelease ? "Sending..." : "Send Release"}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
