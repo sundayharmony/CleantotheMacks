@@ -30,6 +30,8 @@ export default async function VideoReleasePage({
     );
   }
 
+  // Server-rendered expiry check for initial page state.
+  // eslint-disable-next-line react-hooks/purity
   const expired = release.tokenExpiresAt.getTime() < Date.now();
   const alreadySigned = release.status === "SIGNED";
 
