@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState, useCallback } from "react";
 
 type BookingStatus = "NEW" | "CONFIRMED" | "COMPLETED";
 type JobStatus = "assigned" | "in_progress" | "completed" | "cancelled";
-type Tab = "dashboard" | "bookings" | "clients" | "cleaners" | "jobs" | "testimonials" | "gallery";
+type Tab = "dashboard" | "bookings" | "clients" | "cleaners" | "jobs" | "testimonials" | "gallery" | "videoReleases";
 
 type Booking = {
   id: string;
@@ -123,6 +123,23 @@ type GalleryItem = {
   sortOrder: number;
 };
 
+type VideoRelease = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  clientName: string;
+  clientEmail: string;
+  propertyAddress: string | null;
+  bookingId: string | null;
+  tokenExpiresAt: string;
+  status: string;
+  signedAt: string | null;
+  signerName: string | null;
+  signatureText: string | null;
+  signerIp: string | null;
+  signerUserAgent: string | null;
+};
+
 /* ─── Helpers ─── */
 
 function fmt(d: string | null) {
@@ -187,6 +204,7 @@ export default function AdminPage() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
   const [gallery, setGallery] = useState<GalleryItem[]>([]);
+  const [videoReleases, setVideoReleases] = useState<VideoRelease[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
@@ -212,6 +230,7 @@ export default function AdminPage() {
       const jData = await safeFetch("/api/job");
       const tData = await safeFetch("/api/testimonial?all=true");
       const gData = await safeFetch("/api/gallery?all=true");
+      const vrData = await safeFetch("/api/video-release");
 
       // Only show error if ALL core routes failed
       if (!bData && !cData && !clData && !jData) {
@@ -224,6 +243,7 @@ export default function AdminPage() {
       setJobs(jData?.jobs ?? []);
       setTestimonials(tData?.testimonials ?? []);
       setGallery(gData?.gallery ?? []);
+      setVideoReleases(vrData?.releases ?? []);
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : "Failed to load");
     } finally {
@@ -254,9 +274,23 @@ export default function AdminPage() {
 
         {/* Tabs */}
         <div className="tab-nav">
-          {(["dashboard", "bookings", "clients", "cleaners", "jobs", "testimonials", "gallery"] as Tab[]).map((t) => (
+          {(["dashboard", "bookings", "clients", "cleaners", "jobs", "testimonials", "gallery", "videoReleases"] as Tab[]).map((t) => (
             <button key={t} className={`tab-btn${tab === t ? " active" : ""}`} onClick={() => setTab(t)}>
-              {t === "dashboard" ? "Dashboard" : t === "bookings" ? "Bookings" : t === "clients" ? "Clients" : t === "cleaners" ? "Cleaners" : t === "jobs" ? "Jobs" : t === "testimonials" ? "Testimonials" : "Gallery"}
+              {t === "dashboard"
+                ? "Dashboard"
+                : t === "bookings"
+                  ? "Bookings"
+                  : t === "clients"
+                    ? "Clients"
+                    : t === "cleaners"
+                      ? "Cleaners"
+                      : t === "jobs"
+                        ? "Jobs"
+                        : t === "testimonials"
+                          ? "Testimonials"
+                          : t === "gallery"
+                            ? "Gallery"
+                            : "Video Releases"}
             </button>
           ))}
         </div>
@@ -274,6 +308,7 @@ export default function AdminPage() {
             {tab === "jobs" && <JobsTab jobs={jobs} setJobs={setJobs} bookings={bookings} cleaners={cleaners} reload={loadAll} />}
             {tab === "testimonials" && <TestimonialsTab testimonials={testimonials} setTestimonials={setTestimonials} reload={loadAll} />}
             {tab === "gallery" && <GalleryTab gallery={gallery} setGallery={setGallery} reload={loadAll} />}
+            {tab === "videoReleases" && <VideoReleasesTab videoReleases={videoReleases} bookings={bookings} reload={loadAll} />}
           </>
         )}
       </div>
@@ -1163,6 +1198,210 @@ function JobsTab({ jobs, setJobs, bookings, cleaners, reload }: {
               <button className="btn btn-outline" onClick={deleteJob} disabled={saving} style={{ borderColor: "rgba(239,68,68,0.5)", color: "#fca5a5" }}>Delete Job</button>
               <button className="btn btn-primary" onClick={save} disabled={saving}>{saving ? "Saving…" : "Save Changes"}</button>
             </div>
+          </>
+        )}
+      </Modal>
+    </>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════
+   VIDEO RELEASES TAB
+   ════════════════════════════════════════════════════════════════ */
+
+function VideoReleasesTab({
+  videoReleases,
+  bookings,
+  reload,
+}: {
+  videoReleases: VideoRelease[];
+  bookings: Booking[];
+  reload: () => Promise<void>;
+}) {
+  const [q, setQ] = useState("");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [draft, setDraft] = useState<Record<string, string>>({
+    clientName: "",
+    clientEmail: "",
+    propertyAddress: "",
+    bookingId: "",
+  });
+
+  const filtered = useMemo(() => {
+    const query = q.trim().toLowerCase();
+    return videoReleases.filter((r) => {
+      if (!query) return true;
+      return [r.clientName, r.clientEmail, r.propertyAddress ?? "", r.status]
+        .join(" ")
+        .toLowerCase()
+        .includes(query);
+    });
+  }, [videoReleases, q]);
+
+  const selected = selectedId
+    ? videoReleases.find((r) => r.id === selectedId) ?? null
+    : null;
+
+  function displayStatus(r: VideoRelease) {
+    if (r.status === "SIGNED") return "SIGNED";
+    return new Date(r.tokenExpiresAt).getTime() < Date.now() ? "EXPIRED" : "PENDING";
+  }
+
+  async function resendRelease(releaseId: string) {
+    setSending(true);
+    try {
+      const res = await fetch("/api/video-release/resend", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ releaseId }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || "Failed to resend release");
+      }
+      alert("Release email resent.");
+      await reload();
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : "Failed to resend release");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function createAndSend() {
+    setSending(true);
+    try {
+      const res = await fetch("/api/video-release/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clientName: draft.clientName,
+          clientEmail: draft.clientEmail,
+          propertyAddress: draft.propertyAddress || undefined,
+          bookingId: draft.bookingId || undefined,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || "Failed to send release");
+      }
+      alert("Video release sent.");
+      setDraft({ clientName: "", clientEmail: "", propertyAddress: "", bookingId: "" });
+      setCreating(false);
+      await reload();
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : "Failed to send release");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <>
+      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 16 }}>
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search releases..."
+          style={{ width: 320, maxWidth: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid var(--color-border)", background: "var(--color-surface)", color: "var(--color-text)", outline: "none" }}
+        />
+        <button className="btn btn-primary" onClick={() => setCreating((v) => !v)} style={{ padding: "10px 16px", fontSize: 14 }}>
+          {creating ? "Cancel" : "+ Send New Release"}
+        </button>
+        <span style={{ opacity: 0.75, fontSize: 14 }}>{filtered.length} releases</span>
+      </div>
+
+      {creating && (
+        <div className="card" style={{ display: "grid", gap: 12, marginBottom: 16 }}>
+          <h3 style={{ margin: 0, fontSize: 18 }}>Send Video Release Form</h3>
+          <div className="grid grid-2">
+            <label>Client Name *<input className="input" value={draft.clientName} onChange={(e) => setDraft({ ...draft, clientName: e.target.value })} /></label>
+            <label>Client Email *<input className="input" type="email" value={draft.clientEmail} onChange={(e) => setDraft({ ...draft, clientEmail: e.target.value })} /></label>
+            <label>Property Address<input className="input" value={draft.propertyAddress} onChange={(e) => setDraft({ ...draft, propertyAddress: e.target.value })} /></label>
+            <label>Link Booking (optional)
+              <select className="input" value={draft.bookingId} onChange={(e) => setDraft({ ...draft, bookingId: e.target.value })}>
+                <option value="">None</option>
+                {bookings.map((b) => <option key={b.id} value={b.id}>{b.name} — {b.address}</option>)}
+              </select>
+            </label>
+          </div>
+          <div style={{ display: "flex", justifyContent: "flex-end" }}>
+            <button className="btn btn-primary" disabled={sending || !draft.clientName || !draft.clientEmail} onClick={createAndSend}>
+              {sending ? "Sending..." : "Send Release Form"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {filtered.length === 0 ? (
+        <p style={{ opacity: 0.75 }}>No video releases found.</p>
+      ) : (
+        <div className="admin-table-wrap">
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th>Created</th><th>Client</th><th>Email</th><th>Address</th><th>Expires</th><th>Status</th><th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((r) => {
+                const state = displayStatus(r);
+                return (
+                  <tr key={r.id}>
+                    <td style={{ whiteSpace: "nowrap" }}>{fmtDate(r.createdAt)}</td>
+                    <td>{r.clientName}</td>
+                    <td><span style={{ color: "var(--color-secondary)" }}>{r.clientEmail}</span></td>
+                    <td>{r.propertyAddress || <span style={{ opacity: 0.5 }}>—</span>}</td>
+                    <td style={{ whiteSpace: "nowrap" }}>{fmt(r.tokenExpiresAt)}</td>
+                    <td><span style={pillStyle(state === "PENDING" ? "CONFIRMED" : state === "SIGNED" ? "completed" : "cancelled")}>{state}</span></td>
+                    <td>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button
+                          onClick={() => setSelectedId(r.id)}
+                          style={{ padding: "4px 10px", borderRadius: 8, border: "1px solid var(--color-border)", color: "var(--color-text)", background: "transparent", cursor: "pointer", fontSize: 13 }}
+                        >
+                          View
+                        </button>
+                        <button
+                          disabled={sending || state === "SIGNED"}
+                          onClick={() => resendRelease(r.id)}
+                          style={{ padding: "4px 10px", borderRadius: 8, border: "1px solid var(--color-border)", color: state === "SIGNED" ? "var(--color-muted)" : "var(--color-text)", background: "transparent", cursor: sending || state === "SIGNED" ? "not-allowed" : "pointer", fontSize: 13 }}
+                        >
+                          {sending ? "Sending..." : "Resend"}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <Modal open={!!selected} onClose={() => setSelectedId(null)}>
+        {selected && (
+          <>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", gap: 16 }}>
+              <div>
+                <h2 style={{ margin: 0, fontSize: 24 }}>Release Details</h2>
+                <p style={{ marginTop: 4, opacity: 0.75, fontSize: 14 }}>Created: {fmt(selected.createdAt)}</p>
+              </div>
+              <button className="btn btn-outline" onClick={() => setSelectedId(null)} style={{ padding: "6px 14px", fontSize: 13 }}>Close</button>
+            </div>
+            <div className="grid grid-2">
+              <div><b>Client:</b> {selected.clientName}</div>
+              <div><b>Email:</b> {selected.clientEmail}</div>
+              <div><b>Address:</b> {selected.propertyAddress || "—"}</div>
+              <div><b>Status:</b> {displayStatus(selected)}</div>
+              <div><b>Signed at:</b> {fmt(selected.signedAt)}</div>
+              <div><b>Signer name:</b> {selected.signerName || "—"}</div>
+            </div>
+            <div><b>Signature:</b> {selected.signatureText || "—"}</div>
+            <div><b>Signer IP:</b> {selected.signerIp || "—"}</div>
+            <div><b>User Agent:</b> {selected.signerUserAgent || "—"}</div>
           </>
         )}
       </Modal>

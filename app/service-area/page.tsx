@@ -56,6 +56,17 @@ const PHILLY_POLYGON: [number, number][] = [
   [39.95, -75.08],
 ];
 
+const SOUTH_JERSEY_CORE_POLYGON: [number, number][] = [
+  [39.30, -75.10],
+  [39.30, -74.65],
+  [39.55, -74.45],
+  [39.78, -74.52],
+  [39.92, -74.70],
+  [39.90, -74.98],
+  [39.70, -75.14],
+  [39.48, -75.20],
+];
+
 export default function ServiceAreaPage() {
   const mapRef = useRef<HTMLDivElement>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
@@ -87,11 +98,21 @@ export default function ServiceAreaPage() {
       L.polygon(NJ_POLYGON, {
         color: "#3b82f6",
         fillColor: "#3b82f6",
-        fillOpacity: 0.15,
+        fillOpacity: 0.08,
         weight: 2,
       })
         .addTo(map)
         .bindPopup("<strong>South &amp; Central Jersey</strong><br/>Full service coverage");
+
+      // South Jersey core highlight
+      L.polygon(SOUTH_JERSEY_CORE_POLYGON, {
+        color: "#2563eb",
+        fillColor: "#2563eb",
+        fillOpacity: 0.24,
+        weight: 3,
+      })
+        .addTo(map)
+        .bindPopup("<strong>South Jersey Core</strong><br/>Atlantic County and surrounding counties");
 
       // Philly polygon
       L.polygon(PHILLY_POLYGON, {
@@ -113,6 +134,10 @@ export default function ServiceAreaPage() {
       L.circleMarker([39.93, -74.95], { ...markerOpts, fillColor: "#3b82f6" })
         .addTo(map)
         .bindPopup("Cherry Hill, NJ");
+
+      L.circleMarker([39.36, -74.43], { ...markerOpts, fillColor: "#2563eb", radius: 7 })
+        .addTo(map)
+        .bindPopup("Atlantic County, NJ");
 
       L.circleMarker([39.98, -74.82], { ...markerOpts, fillColor: "#3b82f6" })
         .addTo(map)
@@ -165,8 +190,12 @@ export default function ServiceAreaPage() {
 
           <div style={{ display: "flex", gap: 16, marginBottom: 32, flexWrap: "wrap" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ width: 14, height: 14, borderRadius: 4, background: "#2563eb", display: "inline-block" }} />
+              <span style={{ fontSize: 14, fontWeight: 700 }}>South Jersey Core</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ width: 14, height: 14, borderRadius: 4, background: "#3b82f6", display: "inline-block" }} />
-              <span style={{ fontSize: 14 }}>New Jersey</span>
+              <span style={{ fontSize: 14 }}>Greater New Jersey Coverage</span>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ width: 14, height: 14, borderRadius: 4, background: "#8b5cf6", display: "inline-block" }} />
