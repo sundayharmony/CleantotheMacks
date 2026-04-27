@@ -18,6 +18,15 @@ interface EmailPayload {
   html: string;
 }
 
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
 async function sendEmail(payload: EmailPayload): Promise<boolean> {
   if (!RESEND_API_KEY) {
     console.log("[EMAIL STUB]", payload.subject, "->", payload.to);
@@ -212,6 +221,39 @@ export async function notifyAdminJobCompleted(data: {
         <p style="margin: 4px 0;"><strong>Address:</strong> ${data.address}</p>
         ${data.totalPay ? `<p style="margin: 4px 0;"><strong>Total pay:</strong> $${data.totalPay.toFixed(2)}</p>` : ""}
       </div>
+    `),
+  });
+}
+
+/** Sent to a client when a video release needs signature */
+export async function notifyVideoReleaseRequest(data: {
+  clientName: string;
+  clientEmail: string;
+  propertyAddress?: string | null;
+  signingUrl: string;
+  expiresAtText: string;
+}) {
+  const safeName = escapeHtml(data.clientName);
+  const safeAddress = data.propertyAddress ? escapeHtml(data.propertyAddress) : null;
+  const safeUrl = escapeHtml(data.signingUrl);
+
+  await sendEmail({
+    to: data.clientEmail,
+    subject: "Video Release Form - Signature Requested",
+    html: wrap(`
+      <h2 style="color: #111; font-size: 18px;">Hi ${safeName},</h2>
+      <p style="color: #374151; line-height: 1.6;">
+        Please review and electronically sign the video release form so we can share media from your service.
+      </p>
+      ${safeAddress ? `<p style="color: #374151; line-height: 1.6;"><strong>Property:</strong> ${safeAddress}</p>` : ""}
+      <p style="margin: 20px 0;">
+        <a href="${safeUrl}" style="display: inline-block; padding: 10px 16px; border-radius: 8px; background: #2563eb; color: #fff; text-decoration: none; font-weight: 600;">
+          Review and Sign Form
+        </a>
+      </p>
+      <p style="color: #6b7280; font-size: 13px;">
+        This secure link expires on ${escapeHtml(data.expiresAtText)}.
+      </p>
     `),
   });
 }

@@ -79,6 +79,30 @@ model Booking {
   client        Client?  @relation(fields: [clientId], references: [id], onDelete: SetNull)
 
   cleaningJob   CleaningJob?
+  videoReleases VideoRelease[]
+}
+
+model VideoRelease {
+  id             String   @id @default(cuid())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  clientName     String
+  clientEmail    String
+  propertyAddress String?
+
+  bookingId      String?
+  booking        Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+
+  token          String   @unique
+  tokenExpiresAt DateTime
+
+  status         String   @default("PENDING")
+  signedAt       DateTime?
+  signerName     String?
+  signatureText  String?
+  signerIp       String?
+  signerUserAgent String?
 }
 
 model CleaningJob {

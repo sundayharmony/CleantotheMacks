@@ -297,6 +297,7 @@ function BookingsTab({ bookings, setBookings, cleaners, clients, reload }: {
   const [q, setQ] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [sendingRelease, setSendingRelease] = useState(false);
 
   const filtered = useMemo(() => {
     const query = q.trim().toLowerCase();
@@ -358,6 +359,31 @@ function BookingsTab({ bookings, setBookings, cleaners, clients, reload }: {
       if (!res.ok) { const d = await res.json().catch(() => null); throw new Error(d?.error || "Assign failed"); }
       await reload();
     } catch (e: unknown) { alert(e instanceof Error ? e.message : "Assign failed"); }
+  }
+
+  async function sendVideoRelease(booking: Booking) {
+    setSendingRelease(true);
+    try {
+      const res = await fetch("/api/video-release/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clientName: booking.name,
+          clientEmail: booking.email,
+          propertyAddress: booking.address,
+          bookingId: booking.id,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || "Failed to send video release form");
+      }
+      alert(`Video release sent to ${booking.email}`);
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : "Failed to send video release form");
+    } finally {
+      setSendingRelease(false);
+    }
   }
 
   return (
@@ -467,7 +493,16 @@ function BookingsTab({ bookings, setBookings, cleaners, clients, reload }: {
 
             <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
               <button className="btn btn-outline" onClick={deleteBooking} disabled={saving} style={{ borderColor: "rgba(239,68,68,0.5)", color: "#fca5a5" }}>Delete Booking</button>
-              <button className="btn btn-primary" onClick={save} disabled={saving}>{saving ? "Saving…" : "Save Changes"}</button>
+              <div style={{ display: "flex", gap: 10, marginLeft: "auto", flexWrap: "wrap" }}>
+                <button
+                  className="btn btn-outline"
+                  onClick={() => sendVideoRelease(selected)}
+                  disabled={sendingRelease}
+                >
+                  {sendingRelease ? "Sending..." : "Send Video Release"}
+                </button>
+                <button className="btn btn-primary" onClick={save} disabled={saving}>{saving ? "Saving…" : "Save Changes"}</button>
+              </div>
             </div>
           </>
         )}

@@ -51,6 +51,10 @@ export default async function Home() {
       title: "Add-on Focus",
       detail: "Appliance interiors, inside cabinets, baseboards, and more on request.",
     },
+    {
+      title: "Interior Painting",
+      detail: "Refresh rooms with clean, professional painting for walls, trim, and touch-ups.",
+    },
   ];
 
   const testimonials = await getTestimonials();
@@ -62,11 +66,11 @@ export default async function Home() {
           <div className="stack">
             <span className="hero-badge">Trusted home cleaning</span>
             <h1 style={{ fontSize: 52, lineHeight: 1.05 }}>
-              A spotless home, done right every time.
+              Cleaning and painting services, done right every time.
             </h1>
             <p className="section-subtitle">
-              Book reliable residential cleaning with a friendly crew, clear
-              communication, and professional results.
+              Book reliable residential cleaning and interior painting with a
+              friendly crew, clear communication, and professional results.
             </p>
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
               <a className="btn btn-primary" href="/book">

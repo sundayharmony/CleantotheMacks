@@ -7,7 +7,18 @@ import Link from "next/link";
 const SERVICE_AREAS = [
   {
     name: "South Jersey",
-    areas: ["Cherry Hill", "Voorhees", "Haddonfield", "Marlton", "Moorestown", "Mount Laurel", "Cinnaminson", "Delran", "Medford", "Collingswood"],
+    areas: [
+      "Atlantic County",
+      "Camden County",
+      "Burlington County",
+      "Gloucester County",
+      "Cape May County",
+      "Cumberland County",
+      "Salem County",
+      "Cherry Hill",
+      "Voorhees",
+      "Marlton",
+    ],
   },
   {
     name: "Philadelphia Metro",
@@ -126,7 +137,8 @@ export default function ServiceAreaPage() {
         <div className="container">
           <h1 style={{ fontSize: 40, marginBottom: 12 }}>Service Area</h1>
           <p className="section-subtitle">
-            We proudly serve homes across New Jersey and the Philadelphia metro area.
+            We proudly serve homes across South Jersey (including Atlantic County
+            and surrounding counties), Central Jersey, and the Philadelphia metro area.
           </p>
         </div>
       </section>
