@@ -400,15 +400,26 @@ function BookingsTab({ bookings, setBookings, cleaners, clients, reload }: {
       const scheduledDatePatch =
         draft.scheduledDate?.trim() ? new Date(draft.scheduledDate).toISOString() : null;
       const res = await fetch(`/api/book/${selected.id}`, {
-        method: "PATCH", headers: { "Content-Type": "application/json" },
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...draft,
+          name: draft.name,
+          email: draft.email,
+          phone: draft.phone,
+          address: draft.address,
+          homeSize: draft.homeSize,
           sqft: draft.sqft,
-          clientId: draft.clientId || null,
+          notes: draft.notes,
+          status: draft.status,
+          clientId: draft.clientId?.trim() ? draft.clientId : null,
+          serviceType: draft.serviceType?.trim() || null,
           scheduledDate: scheduledDatePatch,
         }),
       });
-      if (!res.ok) throw new Error("Save failed");
+      if (!res.ok) {
+        const errData = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(errData?.error || `Save failed (${res.status})`);
+      }
       await reload();
       setSelectedId(null);
     } catch (e: unknown) {

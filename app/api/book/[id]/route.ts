@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { notifyBookingCanceled } from "@/lib/email";
 
@@ -10,23 +11,23 @@ async function requireAdmin() {
   return !!cookieStore.get("admin_session")?.value;
 }
 
-// NOTE: Use a permissive `context: any` param and defensively resolve params
-// because the build-time types in Vercel/Next can differ (sometimes params
-// may be provided as a Promise). This keeps the runtime behavior unchanged
-// while avoiding brittle type errors during `next build`.
+/** Next.js 15+ passes `params` as a Promise; older builds use a plain object. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function resolveParams(context: any): Promise<{ id?: string }> {
+  const raw = context?.params;
+  if (!raw) return {};
+  const resolved = await Promise.resolve(raw);
+  return resolved && typeof resolved === "object" ? resolved : {};
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function PATCH(req: Request, context: any) {
   try {
     if (!(await requireAdmin())) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    // defensive: support context.params being a Promise or a plain object
-    const rawParams = context?.params;
-    const params =
-      rawParams && typeof rawParams.then === "function"
-        ? await rawParams
-        : rawParams;
 
+    const routeParams = await resolveParams(context);
     const body = (await req.json()) as {
       id?: string;
       status?: string;
@@ -42,10 +43,10 @@ export async function PATCH(req: Request, context: any) {
       scheduledDate?: string | null;
       serviceType?: string | null;
     };
-    const id = params?.id ?? body.id;
+    const id = routeParams?.id ?? body.id;
 
-    if (!id) {
-      return NextResponse.json({ error: "Missing id" }, { status: 400 });
+    if (!id || typeof id !== "string") {
+      return NextResponse.json({ error: "Missing booking id" }, { status: 400 });
     }
 
     const data: {
@@ -93,7 +94,18 @@ export async function PATCH(req: Request, context: any) {
       data.clientId = body.clientId || null;
     }
     if (body.scheduledDate !== undefined) {
-      data.scheduledDate = body.scheduledDate ? new Date(body.scheduledDate) : null;
+      if (body.scheduledDate === null || body.scheduledDate === "") {
+        data.scheduledDate = null;
+      } else {
+        const parsed = new Date(body.scheduledDate);
+        if (Number.isNaN(parsed.getTime())) {
+          return NextResponse.json(
+            { error: "Invalid appointment date — check date and time." },
+            { status: 400 },
+          );
+        }
+        data.scheduledDate = parsed;
+      }
     }
     if (typeof body.serviceType === "string") {
       data.serviceType = body.serviceType.trim() || null;
@@ -108,16 +120,16 @@ export async function PATCH(req: Request, context: any) {
       select: { status: true, name: true, email: true, scheduledDate: true },
     });
 
+    if (!existing) {
+      return NextResponse.json({ error: "Booking not found" }, { status: 404 });
+    }
+
     const updated = await prisma.booking.update({
       where: { id },
       data,
     });
 
-    if (
-      existing &&
-      data.status === "CANCELED" &&
-      existing.status !== "CANCELED"
-    ) {
+    if (data.status === "CANCELED" && existing.status !== "CANCELED") {
       notifyBookingCanceled({
         clientName: existing.name,
         clientEmail: existing.email,
@@ -130,7 +142,24 @@ export async function PATCH(req: Request, context: any) {
     return NextResponse.json({ success: true, booking: updated });
   } catch (err) {
     console.error("PATCH /api/book/[id] failed:", err);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    if (err instanceof Prisma.PrismaClientKnownRequestError) {
+      if (err.code === "P2003") {
+        return NextResponse.json(
+          {
+            error:
+              "Could not save — the linked client may have been removed. Set Link Client to None and try again.",
+          },
+          { status: 400 },
+        );
+      }
+      if (err.code === "P2025") {
+        return NextResponse.json({ error: "Booking not found" }, { status: 404 });
+      }
+    }
+    return NextResponse.json(
+      { error: "Save failed on the server. If this keeps happening, run database migrations or check logs." },
+      { status: 500 },
+    );
   }
 }
 
@@ -140,14 +169,10 @@ export async function DELETE(_req: Request, context: any) {
     if (!(await requireAdmin())) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const rawParams = context?.params;
-    const params =
-      rawParams && typeof rawParams.then === "function"
-        ? await rawParams
-        : rawParams;
-    const { id } = params ?? {};
+    const routeParams = await resolveParams(context);
+    const id = routeParams?.id;
 
-    if (!id) {
+    if (!id || typeof id !== "string") {
       return NextResponse.json({ error: "Missing id" }, { status: 400 });
     }
 
