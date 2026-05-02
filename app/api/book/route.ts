@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { notifyNewBooking } from "@/lib/email";
+import {
+  safeAvailabilityConfigForDay,
+  safeBlockedSlotsForDay,
+  safeBookingsForDay,
+} from "@/lib/prisma-scheduling-compat";
 import {
   AvailabilityRule,
   DEFAULT_AVAILABILITY,
@@ -30,21 +36,9 @@ async function isSlotAvailable(scheduledDate: Date, slotMinutes: number): Promis
   const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
 
   const [configRows, bookings, blocks] = await Promise.all([
-    prisma.availabilityConfig.findMany({ where: { dayOfWeek: scheduledDate.getDay() } }),
-    prisma.booking.findMany({
-      where: {
-        scheduledDate: { gte: dayStart, lt: dayEnd },
-        status: { in: ["NEW", "CONFIRMED", "COMPLETED"] },
-      },
-      select: { scheduledDate: true, slotMinutes: true },
-    }),
-    prisma.blockedSlot.findMany({
-      where: {
-        startAt: { lt: dayEnd },
-        endAt: { gt: dayStart },
-      },
-      select: { startAt: true, endAt: true },
-    }),
+    safeAvailabilityConfigForDay(scheduledDate.getDay()),
+    safeBookingsForDay(dayStart, dayEnd),
+    safeBlockedSlotsForDay(dayStart, dayEnd),
   ]);
 
   const rule: AvailabilityRule =
@@ -63,7 +57,8 @@ async function isSlotAvailable(scheduledDate: Date, slotMinutes: number): Promis
   const busy: SlotRange[] = [];
   for (const b of bookings) {
     if (!b.scheduledDate) continue;
-    const minutes = b.slotMinutes ?? 60;
+    /* Slot length column may not exist until migrations run; default matches generator */
+    const minutes = 60;
     busy.push({
       startAt: b.scheduledDate,
       endAt: new Date(b.scheduledDate.getTime() + minutes * 60 * 1000),
@@ -148,21 +143,35 @@ export async function POST(request: Request) {
     }
   }
 
+  const fullCreate = {
+    name,
+    email,
+    phone: phone || null,
+    address,
+    homeSize,
+    sqft: sqft || null,
+    notes: notes || null,
+    serviceType,
+    scheduledDate: scheduledDate ?? undefined,
+    slotMinutes: scheduledDate ? slotMinutes : null,
+  } satisfies Parameters<typeof prisma.booking.create>[0]["data"];
+
   try {
-    const booking = await prisma.booking.create({
-      data: {
-        name,
-        email,
-        phone: phone || null,
-        address,
-        homeSize,
-        sqft: sqft || null,
-        notes: notes || null,
-        serviceType,
-        scheduledDate: scheduledDate ?? undefined,
-        slotMinutes: scheduledDate ? slotMinutes : null,
-      },
-    });
+    let booking;
+    try {
+      booking = await prisma.booking.create({ data: fullCreate });
+    } catch (firstErr) {
+      /* Older DBs before scheduling migration have no slotMinutes column */
+      if (
+        firstErr instanceof Prisma.PrismaClientKnownRequestError &&
+        firstErr.code === "P2022"
+      ) {
+        const { slotMinutes: _omit, ...rest } = fullCreate;
+        booking = await prisma.booking.create({ data: rest });
+      } else {
+        throw firstErr;
+      }
+    }
 
     notifyNewBooking({
       name,
@@ -207,7 +216,6 @@ export async function GET() {
         clientId: true,
         scheduledDate: true,
         serviceType: true,
-        slotMinutes: true,
         cleaningJob: {
           select: { id: true, cleanerId: true, status: true },
         },

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/db";
+import { safeAvailabilityConfigRows } from "@/lib/prisma-scheduling-compat";
 import { AvailabilityRule, DEFAULT_AVAILABILITY } from "@/lib/scheduling";
 
 export const runtime = "nodejs";
@@ -21,7 +22,7 @@ export async function GET() {
   }
 
   try {
-    const rows = await prisma.availabilityConfig.findMany();
+    const rows = await safeAvailabilityConfigRows();
     const byDay = new Map<number, AvailabilityRule>();
     for (const r of DEFAULT_AVAILABILITY) byDay.set(r.dayOfWeek, r);
     for (const r of rows) {

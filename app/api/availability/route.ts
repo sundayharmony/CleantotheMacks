@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import {
+  safeAvailabilityConfigRows,
+  safeBlockedSlotsForRange,
+  safeBookingsWithScheduledRange,
+} from "@/lib/prisma-scheduling-compat";
 import {
   AvailabilityRule,
   DEFAULT_AVAILABILITY,
@@ -42,22 +46,11 @@ export async function GET(request: Request) {
   }
 
   try {
+    const rangeEnd = new Date(to.getTime() + 24 * 60 * 60 * 1000);
     const [configRows, bookings, blocks] = await Promise.all([
-      prisma.availabilityConfig.findMany(),
-      prisma.booking.findMany({
-        where: {
-          scheduledDate: { gte: from, lte: new Date(to.getTime() + 24 * 60 * 60 * 1000) },
-          status: { in: ["NEW", "CONFIRMED", "COMPLETED"] },
-        },
-        select: { scheduledDate: true, slotMinutes: true },
-      }),
-      prisma.blockedSlot.findMany({
-        where: {
-          startAt: { lte: new Date(to.getTime() + 24 * 60 * 60 * 1000) },
-          endAt: { gte: from },
-        },
-        select: { startAt: true, endAt: true },
-      }),
+      safeAvailabilityConfigRows(),
+      safeBookingsWithScheduledRange(from, rangeEnd),
+      safeBlockedSlotsForRange(from, rangeEnd),
     ]);
 
     const ruleByDay = new Map<number, AvailabilityRule>();
@@ -75,7 +68,7 @@ export async function GET(request: Request) {
     const busy: SlotRange[] = [];
     for (const b of bookings) {
       if (!b.scheduledDate) continue;
-      const minutes = b.slotMinutes ?? 60;
+      const minutes = 60;
       busy.push({
         startAt: b.scheduledDate,
         endAt: new Date(b.scheduledDate.getTime() + minutes * 60 * 1000),

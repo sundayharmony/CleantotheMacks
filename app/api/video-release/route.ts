@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 
 export const runtime = "nodejs";
@@ -36,6 +37,12 @@ export async function GET() {
     return NextResponse.json({ releases });
   } catch (err) {
     console.error("GET /api/video-release failed:", err);
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2021") {
+      return NextResponse.json({
+        releases: [],
+        warning: "VideoRelease table not found. Run: npx prisma migrate deploy",
+      });
+    }
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

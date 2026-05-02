@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/db";
+import { safeAllBlockedSlots } from "@/lib/prisma-scheduling-compat";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,7 +16,7 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
-    const blocks = await prisma.blockedSlot.findMany({ orderBy: { startAt: "asc" } });
+    const blocks = await safeAllBlockedSlots();
     return NextResponse.json({ blocks });
   } catch (err) {
     console.error("GET /api/availability/block failed:", err);
