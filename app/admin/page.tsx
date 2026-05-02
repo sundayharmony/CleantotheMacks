@@ -4,9 +4,9 @@ import { useEffect, useMemo, useState, useCallback } from "react";
 
 /* ─── Shared Types ─── */
 
-type BookingStatus = "NEW" | "CONFIRMED" | "COMPLETED";
+type BookingStatus = "NEW" | "CONFIRMED" | "COMPLETED" | "CANCELED";
 type JobStatus = "assigned" | "in_progress" | "completed" | "cancelled";
-type Tab = "dashboard" | "bookings" | "clients" | "cleaners" | "jobs" | "testimonials" | "gallery" | "videoReleases";
+type Tab = "dashboard" | "bookings" | "schedule" | "clients" | "cleaners" | "jobs" | "testimonials" | "gallery" | "videoReleases";
 
 type Booking = {
   id: string;
@@ -22,7 +22,23 @@ type Booking = {
   clientId: string | null;
   scheduledDate: string | null;
   serviceType: string | null;
+  slotMinutes?: number | null;
   cleaningJob?: { id: string; cleanerId: string; status: string } | null;
+};
+
+type AvailabilityRule = {
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+  slotMinutes: number;
+  enabled: boolean;
+};
+
+type BlockedSlot = {
+  id: string;
+  startAt: string;
+  endAt: string;
+  reason: string | null;
 };
 
 type Client = {
@@ -162,6 +178,7 @@ function statusBadge(status: string) {
     NEW: { border: "1px solid var(--color-border)", color: "var(--color-text)", background: "rgba(255,255,255,0.06)" },
     CONFIRMED: { border: "1px solid rgba(88,166,255,0.5)", color: "var(--color-secondary)", background: "rgba(88,166,255,0.12)" },
     COMPLETED: { border: "1px solid rgba(34,197,94,0.4)", color: "#86efac", background: "rgba(34,197,94,0.12)" },
+    CANCELED: { border: "1px solid rgba(239,68,68,0.4)", color: "#fca5a5", background: "rgba(239,68,68,0.12)" },
     assigned: { border: "1px solid var(--color-border)", color: "var(--color-text)", background: "rgba(255,255,255,0.06)" },
     in_progress: { border: "1px solid rgba(251,191,36,0.5)", color: "#fde68a", background: "rgba(251,191,36,0.12)" },
     completed: { border: "1px solid rgba(34,197,94,0.4)", color: "#86efac", background: "rgba(34,197,94,0.12)" },
@@ -274,23 +291,25 @@ export default function AdminPage() {
 
         {/* Tabs */}
         <div className="tab-nav">
-          {(["dashboard", "bookings", "clients", "cleaners", "jobs", "testimonials", "gallery", "videoReleases"] as Tab[]).map((t) => (
+          {(["dashboard", "bookings", "schedule", "clients", "cleaners", "jobs", "testimonials", "gallery", "videoReleases"] as Tab[]).map((t) => (
             <button key={t} className={`tab-btn${tab === t ? " active" : ""}`} onClick={() => setTab(t)}>
               {t === "dashboard"
                 ? "Dashboard"
                 : t === "bookings"
                   ? "Bookings"
-                  : t === "clients"
-                    ? "Clients"
-                    : t === "cleaners"
-                      ? "Cleaners"
-                      : t === "jobs"
-                        ? "Jobs"
-                        : t === "testimonials"
-                          ? "Testimonials"
-                          : t === "gallery"
-                            ? "Gallery"
-                            : "Video Releases"}
+                  : t === "schedule"
+                    ? "Schedule"
+                    : t === "clients"
+                      ? "Clients"
+                      : t === "cleaners"
+                        ? "Cleaners"
+                        : t === "jobs"
+                          ? "Jobs"
+                          : t === "testimonials"
+                            ? "Testimonials"
+                            : t === "gallery"
+                              ? "Gallery"
+                              : "Video Releases"}
             </button>
           ))}
         </div>
@@ -303,6 +322,7 @@ export default function AdminPage() {
           <>
             {tab === "dashboard" && <DashboardTab bookings={bookings} clients={clients} jobs={jobs} testimonials={testimonials} setTab={setTab} />}
             {tab === "bookings" && <BookingsTab bookings={bookings} setBookings={setBookings} cleaners={cleaners} clients={clients} reload={loadAll} />}
+            {tab === "schedule" && <ScheduleTab bookings={bookings} reload={loadAll} />}
             {tab === "clients" && <ClientsTab clients={clients} setClients={setClients} reload={loadAll} />}
             {tab === "cleaners" && <CleanersTab cleaners={cleaners} setCleaners={setCleaners} reload={loadAll} />}
             {tab === "jobs" && <JobsTab jobs={jobs} setJobs={setJobs} bookings={bookings} cleaners={cleaners} reload={loadAll} />}
@@ -431,6 +451,7 @@ function BookingsTab({ bookings, setBookings, cleaners, clients, reload }: {
           <option value="NEW">NEW</option>
           <option value="CONFIRMED">CONFIRMED</option>
           <option value="COMPLETED">COMPLETED</option>
+          <option value="CANCELED">CANCELED</option>
         </select>
         <span style={{ opacity: 0.75, fontSize: 14 }}>Showing <b>{filtered.length}</b> of <b>{bookings.length}</b></span>
       </div>
@@ -512,7 +533,7 @@ function BookingsTab({ bookings, setBookings, cleaners, clients, reload }: {
               <label>Sq Ft<input className="input" value={draft.sqft ?? ""} onChange={(e) => setDraft({ ...draft, sqft: e.target.value })} /></label>
               <label>Status
                 <select className="input" value={draft.status ?? "NEW"} onChange={(e) => setDraft({ ...draft, status: e.target.value })}>
-                  <option value="NEW">NEW</option><option value="CONFIRMED">CONFIRMED</option><option value="COMPLETED">COMPLETED</option>
+                  <option value="NEW">NEW</option><option value="CONFIRMED">CONFIRMED</option><option value="COMPLETED">COMPLETED</option><option value="CANCELED">CANCELED</option>
                 </select>
               </label>
               <label>Link Client
@@ -1880,6 +1901,463 @@ function GalleryTab({ gallery, setGallery, reload }: {
           <button className="btn btn-primary" onClick={save} disabled={saving} style={{ marginLeft: "auto" }}>{saving ? "Saving..." : creating ? "Add Item" : "Save Changes"}</button>
         </div>
       </Modal>
+    </>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════
+   SCHEDULE TAB
+   ════════════════════════════════════════════════════════════════ */
+
+const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const DAY_LABELS_LONG = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+function ScheduleTab({ bookings, reload }: {
+  bookings: Booking[];
+  reload: () => Promise<void>;
+}) {
+  const [view, setView] = useState<"calendar" | "list" | "availability" | "blocked">("calendar");
+  const [monthCursor, setMonthCursor] = useState<Date>(() => {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth(), 1);
+  });
+  const [config, setConfig] = useState<AvailabilityRule[]>([]);
+  const [blocked, setBlocked] = useState<BlockedSlot[]>([]);
+  const [loadingCfg, setLoadingCfg] = useState(false);
+  const [savingCfg, setSavingCfg] = useState(false);
+  const [blockDraft, setBlockDraft] = useState({ startAt: "", endAt: "", reason: "" });
+  const [busyBlock, setBusyBlock] = useState(false);
+
+  const loadScheduleData = useCallback(async () => {
+    setLoadingCfg(true);
+    try {
+      const [cfgRes, blkRes] = await Promise.all([
+        fetch("/api/availability/config", { cache: "no-store" }),
+        fetch("/api/availability/block", { cache: "no-store" }),
+      ]);
+      if (cfgRes.ok) {
+        const cd = await cfgRes.json();
+        setConfig(cd.config ?? []);
+      }
+      if (blkRes.ok) {
+        const bd = await blkRes.json();
+        setBlocked(bd.blocks ?? []);
+      }
+    } finally {
+      setLoadingCfg(false);
+    }
+  }, []);
+
+  useEffect(() => { loadScheduleData(); }, [loadScheduleData]);
+
+  const monthStart = monthCursor;
+  const monthEnd = useMemo(
+    () => new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0),
+    [monthStart],
+  );
+
+  const calendarCells = useMemo(() => {
+    const cells: { date: Date; inMonth: boolean }[] = [];
+    const startWeekday = monthStart.getDay();
+    for (let i = startWeekday; i > 0; i--) {
+      const d = new Date(monthStart);
+      d.setDate(d.getDate() - i);
+      cells.push({ date: d, inMonth: false });
+    }
+    for (let day = 1; day <= monthEnd.getDate(); day++) {
+      cells.push({ date: new Date(monthStart.getFullYear(), monthStart.getMonth(), day), inMonth: true });
+    }
+    while (cells.length % 7 !== 0) {
+      const last = cells[cells.length - 1].date;
+      const next = new Date(last);
+      next.setDate(next.getDate() + 1);
+      cells.push({ date: next, inMonth: false });
+    }
+    return cells;
+  }, [monthStart, monthEnd]);
+
+  const bookingsByDay = useMemo(() => {
+    const map = new Map<string, Booking[]>();
+    for (const b of bookings) {
+      if (!b.scheduledDate) continue;
+      const d = new Date(b.scheduledDate);
+      const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(b);
+    }
+    return map;
+  }, [bookings]);
+
+  const scheduledList = useMemo(() => {
+    return bookings
+      .filter((b) => b.scheduledDate)
+      .sort((a, b) => new Date(a.scheduledDate!).getTime() - new Date(b.scheduledDate!).getTime());
+  }, [bookings]);
+
+  function shiftMonth(delta: number) {
+    setMonthCursor(new Date(monthStart.getFullYear(), monthStart.getMonth() + delta, 1));
+  }
+
+  async function setStatus(bookingId: string, status: string) {
+    try {
+      const res = await fetch(`/api/book/${bookingId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      if (!res.ok) throw new Error("Update failed");
+      await reload();
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : "Failed to update status");
+    }
+  }
+
+  function updateRule(dayOfWeek: number, patch: Partial<AvailabilityRule>) {
+    setConfig((prev) => {
+      const next = prev.map((r) => (r.dayOfWeek === dayOfWeek ? { ...r, ...patch } : r));
+      if (!next.some((r) => r.dayOfWeek === dayOfWeek)) {
+        next.push({ dayOfWeek, startTime: "09:00", endTime: "17:00", slotMinutes: 60, enabled: false, ...patch });
+      }
+      return next.sort((a, b) => a.dayOfWeek - b.dayOfWeek);
+    });
+  }
+
+  async function saveConfig() {
+    setSavingCfg(true);
+    try {
+      const res = await fetch("/api/availability/config", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ config }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => null);
+        throw new Error(d?.error || "Save failed");
+      }
+      alert("Availability saved.");
+      await loadScheduleData();
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : "Save failed");
+    } finally {
+      setSavingCfg(false);
+    }
+  }
+
+  async function addBlock() {
+    if (!blockDraft.startAt || !blockDraft.endAt) {
+      alert("Please pick a start and end time.");
+      return;
+    }
+    setBusyBlock(true);
+    try {
+      const res = await fetch("/api/availability/block", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          startAt: new Date(blockDraft.startAt).toISOString(),
+          endAt: new Date(blockDraft.endAt).toISOString(),
+          reason: blockDraft.reason || undefined,
+        }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => null);
+        throw new Error(d?.error || "Failed to block");
+      }
+      setBlockDraft({ startAt: "", endAt: "", reason: "" });
+      await loadScheduleData();
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : "Failed to block");
+    } finally {
+      setBusyBlock(false);
+    }
+  }
+
+  async function removeBlock(id: string) {
+    if (!window.confirm("Remove this blocked time?")) return;
+    try {
+      const res = await fetch(`/api/availability/block?id=${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Remove failed");
+      await loadScheduleData();
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : "Failed to remove");
+    }
+  }
+
+  return (
+    <>
+      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+        {(["calendar", "list", "availability", "blocked"] as const).map((v) => (
+          <button
+            key={v}
+            onClick={() => setView(v)}
+            className={`tab-btn${view === v ? " active" : ""}`}
+            style={{ padding: "8px 14px" }}
+          >
+            {v === "calendar" ? "Calendar" : v === "list" ? "List" : v === "availability" ? "Availability" : "Blocked Times"}
+          </button>
+        ))}
+      </div>
+
+      {view === "calendar" && (
+        <>
+          <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 12, flexWrap: "wrap" }}>
+            <button className="btn btn-outline" onClick={() => shiftMonth(-1)} style={{ padding: "6px 12px" }}>← Prev</button>
+            <strong style={{ fontSize: 16 }}>
+              {monthStart.toLocaleDateString([], { month: "long", year: "numeric" })}
+            </strong>
+            <button className="btn btn-outline" onClick={() => shiftMonth(1)} style={{ padding: "6px 12px" }}>Next →</button>
+            <button className="btn btn-outline" onClick={() => setMonthCursor(new Date(new Date().getFullYear(), new Date().getMonth(), 1))} style={{ padding: "6px 12px" }}>Today</button>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, fontSize: 13 }}>
+            {DAY_LABELS.map((d) => (
+              <div key={d} style={{ textAlign: "center", padding: 6, fontWeight: 600, color: "var(--color-muted)" }}>{d}</div>
+            ))}
+            {calendarCells.map((cell, idx) => {
+              const key = `${cell.date.getFullYear()}-${cell.date.getMonth()}-${cell.date.getDate()}`;
+              const dayBookings = bookingsByDay.get(key) ?? [];
+              const isToday = cell.date.toDateString() === new Date().toDateString();
+              return (
+                <div
+                  key={idx}
+                  style={{
+                    minHeight: 100,
+                    border: `1px solid ${isToday ? "var(--color-primary)" : "var(--color-border)"}`,
+                    borderRadius: 8,
+                    padding: 6,
+                    background: cell.inMonth ? "var(--color-surface)" : "rgba(255,255,255,0.02)",
+                    opacity: cell.inMonth ? 1 : 0.5,
+                  }}
+                >
+                  <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
+                    {cell.date.getDate()}
+                  </div>
+                  <div style={{ display: "grid", gap: 3 }}>
+                    {dayBookings.slice(0, 3).map((b) => (
+                      <div
+                        key={b.id}
+                        title={`${b.name} - ${b.address}`}
+                        style={{
+                          fontSize: 11,
+                          padding: "2px 6px",
+                          borderRadius: 4,
+                          ...statusBadge(b.status),
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {new Date(b.scheduledDate!).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} {b.name}
+                      </div>
+                    ))}
+                    {dayBookings.length > 3 && (
+                      <div style={{ fontSize: 10, color: "var(--color-muted)" }}>+{dayBookings.length - 3} more</div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      {view === "list" && (
+        <>
+          {scheduledList.length === 0 ? (
+            <p style={{ opacity: 0.75 }}>No scheduled appointments yet.</p>
+          ) : (
+            <div className="admin-table-wrap">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Date / Time</th><th>Client</th><th>Service</th><th>Address</th><th>Status</th><th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {scheduledList.map((b) => (
+                    <tr key={b.id}>
+                      <td style={{ whiteSpace: "nowrap" }}>{fmt(b.scheduledDate)}</td>
+                      <td>{b.name}</td>
+                      <td>{b.serviceType || <span style={{ opacity: 0.5 }}>—</span>}</td>
+                      <td>{b.address}</td>
+                      <td><span style={pillStyle(b.status)}>{b.status}</span></td>
+                      <td>
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          {b.status !== "CONFIRMED" && b.status !== "CANCELED" && (
+                            <button
+                              onClick={() => setStatus(b.id, "CONFIRMED")}
+                              style={{ padding: "4px 10px", borderRadius: 8, border: "1px solid rgba(88,166,255,0.5)", color: "var(--color-secondary)", background: "transparent", cursor: "pointer", fontSize: 13 }}
+                            >
+                              Approve
+                            </button>
+                          )}
+                          {b.status !== "CANCELED" && (
+                            <button
+                              onClick={() => setStatus(b.id, "CANCELED")}
+                              style={{ padding: "4px 10px", borderRadius: 8, border: "1px solid rgba(239,68,68,0.4)", color: "#fca5a5", background: "transparent", cursor: "pointer", fontSize: 13 }}
+                            >
+                              Cancel
+                            </button>
+                          )}
+                          {b.status !== "COMPLETED" && b.status !== "CANCELED" && (
+                            <button
+                              onClick={() => setStatus(b.id, "COMPLETED")}
+                              style={{ padding: "4px 10px", borderRadius: 8, border: "1px solid rgba(34,197,94,0.4)", color: "#86efac", background: "transparent", cursor: "pointer", fontSize: 13 }}
+                            >
+                              Complete
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      )}
+
+      {view === "availability" && (
+        <>
+          {loadingCfg ? (
+            <p style={{ opacity: 0.75 }}>Loading availability...</p>
+          ) : (
+            <>
+              <div className="admin-table-wrap" style={{ marginBottom: 16 }}>
+                <table className="admin-table">
+                  <thead>
+                    <tr><th>Day</th><th>Enabled</th><th>Start</th><th>End</th><th>Slot (min)</th></tr>
+                  </thead>
+                  <tbody>
+                    {[0,1,2,3,4,5,6].map((dow) => {
+                      const rule = config.find((r) => r.dayOfWeek === dow) ?? {
+                        dayOfWeek: dow, startTime: "09:00", endTime: "17:00", slotMinutes: 60, enabled: false,
+                      };
+                      return (
+                        <tr key={dow}>
+                          <td>{DAY_LABELS_LONG[dow]}</td>
+                          <td>
+                            <input
+                              type="checkbox"
+                              checked={rule.enabled}
+                              onChange={(e) => updateRule(dow, { enabled: e.target.checked })}
+                              style={{ width: 18, height: 18, accentColor: "var(--color-primary)" }}
+                            />
+                          </td>
+                          <td>
+                            <input
+                              type="time"
+                              className="input"
+                              value={rule.startTime}
+                              onChange={(e) => updateRule(dow, { startTime: e.target.value })}
+                              style={{ width: 130 }}
+                            />
+                          </td>
+                          <td>
+                            <input
+                              type="time"
+                              className="input"
+                              value={rule.endTime}
+                              onChange={(e) => updateRule(dow, { endTime: e.target.value })}
+                              style={{ width: 130 }}
+                            />
+                          </td>
+                          <td>
+                            <select
+                              className="input"
+                              value={rule.slotMinutes}
+                              onChange={(e) => updateRule(dow, { slotMinutes: parseInt(e.target.value, 10) })}
+                              style={{ width: 100 }}
+                            >
+                              {[30, 45, 60, 90, 120, 180, 240].map((m) => (
+                                <option key={m} value={m}>{m}</option>
+                              ))}
+                            </select>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <button className="btn btn-primary" onClick={saveConfig} disabled={savingCfg}>
+                {savingCfg ? "Saving..." : "Save Availability"}
+              </button>
+            </>
+          )}
+        </>
+      )}
+
+      {view === "blocked" && (
+        <>
+          <div className="card" style={{ display: "grid", gap: 12, marginBottom: 16 }}>
+            <h3 style={{ margin: 0, fontSize: 18 }}>Block Time Range</h3>
+            <div className="grid grid-2">
+              <label>Start
+                <input
+                  type="datetime-local"
+                  className="input"
+                  value={blockDraft.startAt}
+                  onChange={(e) => setBlockDraft({ ...blockDraft, startAt: e.target.value })}
+                />
+              </label>
+              <label>End
+                <input
+                  type="datetime-local"
+                  className="input"
+                  value={blockDraft.endAt}
+                  onChange={(e) => setBlockDraft({ ...blockDraft, endAt: e.target.value })}
+                />
+              </label>
+            </div>
+            <label>Reason (optional)
+              <input
+                className="input"
+                value={blockDraft.reason}
+                onChange={(e) => setBlockDraft({ ...blockDraft, reason: e.target.value })}
+                placeholder="e.g. Out of office, holiday"
+              />
+            </label>
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <button className="btn btn-primary" onClick={addBlock} disabled={busyBlock}>
+                {busyBlock ? "Saving..." : "Add Blocked Range"}
+              </button>
+            </div>
+          </div>
+
+          {blocked.length === 0 ? (
+            <p style={{ opacity: 0.75 }}>No blocked time ranges.</p>
+          ) : (
+            <div className="admin-table-wrap">
+              <table className="admin-table">
+                <thead>
+                  <tr><th>Start</th><th>End</th><th>Reason</th><th></th></tr>
+                </thead>
+                <tbody>
+                  {blocked.map((b) => (
+                    <tr key={b.id}>
+                      <td style={{ whiteSpace: "nowrap" }}>{fmt(b.startAt)}</td>
+                      <td style={{ whiteSpace: "nowrap" }}>{fmt(b.endAt)}</td>
+                      <td>{b.reason || <span style={{ opacity: 0.5 }}>—</span>}</td>
+                      <td>
+                        <button
+                          onClick={() => removeBlock(b.id)}
+                          style={{ padding: "4px 10px", borderRadius: 8, border: "1px solid rgba(239,68,68,0.4)", color: "#fca5a5", background: "transparent", cursor: "pointer", fontSize: 13 }}
+                        >
+                          Remove
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      )}
     </>
   );
 }

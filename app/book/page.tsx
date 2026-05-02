@@ -1,19 +1,97 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+
+type Slot = { startAt: string; endAt: string; available: boolean };
+type Day = { date: string; dayOfWeek: number; slots: Slot[] };
+
+const SERVICE_OPTIONS = [
+  { value: "standard", label: "Standard Cleaning" },
+  { value: "deep_clean", label: "Deep Clean" },
+  { value: "move_in", label: "Move-In / Move-Out" },
+  { value: "recurring", label: "Recurring Cleaning" },
+  { value: "painting", label: "Interior Painting" },
+];
+
+function formatTime(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
+function formatDateLabel(date: string): string {
+  const [y, m, d] = date.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString([], {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+}
 
 export default function BookPage() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [days, setDays] = useState<Day[]>([]);
+  const [loadingSlots, setLoadingSlots] = useState(true);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
+  const [serviceType, setServiceType] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      setLoadingSlots(true);
+      try {
+        const res = await fetch("/api/availability", { cache: "no-store" });
+        if (!res.ok) throw new Error("Failed to load availability");
+        const data = (await res.json()) as { days: Day[] };
+        if (cancelled) return;
+        setDays(data.days);
+        const firstAvailable = data.days.find((d) => d.slots.some((s) => s.available));
+        if (firstAvailable) setSelectedDate(firstAvailable.date);
+      } catch {
+        if (!cancelled) setDays([]);
+      } finally {
+        if (!cancelled) setLoadingSlots(false);
+      }
+    }
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const availableDays = useMemo(
+    () => days.filter((d) => d.slots.some((s) => s.available)),
+    [days],
+  );
+
+  const selectedDay = useMemo(
+    () => days.find((d) => d.date === selectedDate) ?? null,
+    [days, selectedDate],
+  );
+
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setLoading(true);
     setError(null);
+
+    if (!serviceType) {
+      setError("Please choose a service type.");
+      return;
+    }
+    if (!selectedSlot) {
+      setError("Please select a time slot.");
+      return;
+    }
+
+    setLoading(true);
 
     const form = e.currentTarget;
     const formData = new FormData(form);
+    const slotMinutes = Math.round(
+      (new Date(selectedSlot.endAt).getTime() - new Date(selectedSlot.startAt).getTime()) / 60000,
+    );
 
     const payload = {
       name: formData.get("name"),
@@ -23,6 +101,9 @@ export default function BookPage() {
       homeSize: formData.get("homeSize"),
       sqft: formData.get("sqft"),
       notes: formData.get("notes"),
+      serviceType,
+      scheduledDate: selectedSlot.startAt,
+      slotMinutes,
     };
 
     try {
@@ -35,12 +116,22 @@ export default function BookPage() {
       if (!res.ok) {
         const data = await res.json().catch(() => null);
         setError(data?.error || "Something went wrong. Please try again.");
+        if (res.status === 409) {
+          const refreshed = await fetch("/api/availability", { cache: "no-store" });
+          if (refreshed.ok) {
+            const d = (await refreshed.json()) as { days: Day[] };
+            setDays(d.days);
+            setSelectedSlot(null);
+          }
+        }
         setLoading(false);
         return;
       }
 
       setSuccess(true);
+      setSelectedSlot(null);
       form.reset();
+      setServiceType("");
     } catch {
       setError("Network error. Please check your connection and try again.");
     } finally {
@@ -54,16 +145,16 @@ export default function BookPage() {
         <div className="hero" style={{ alignItems: "start" }}>
           <div className="stack">
             <span className="hero-badge">Booking</span>
-            <h1 style={{ fontSize: 44, marginBottom: 10 }}>Book a Cleaning</h1>
+            <h1 style={{ fontSize: 44, marginBottom: 10 }}>Book an Appointment</h1>
             <p className="section-subtitle">
-              Share a few details and we’ll confirm a time that works for you.
+              Pick a service, choose a time that works, and we will confirm by email.
             </p>
             <div className="card">
               <h3 style={{ marginBottom: 10 }}>What happens next</h3>
               <ol style={{ display: "grid", gap: 10, color: "var(--color-muted)" }}>
-                <li>We review your request.</li>
-                <li>We confirm your preferred schedule.</li>
-                <li>We arrive ready with a checklist tailored to your home.</li>
+                <li>You receive an instant booking confirmation email.</li>
+                <li>We review and confirm your appointment.</li>
+                <li>We arrive on time and ready to take care of your space.</li>
               </ol>
             </div>
           </div>
@@ -71,14 +162,12 @@ export default function BookPage() {
           <div>
             {success && (
               <p style={{ color: "limegreen", marginBottom: 12 }}>
-                Booking submitted successfully!
+                Booking submitted successfully. Check your email for confirmation.
               </p>
             )}
 
             {error && (
-              <p style={{ color: "tomato", marginBottom: 12 }}>
-                {error}
-              </p>
+              <p style={{ color: "tomato", marginBottom: 12 }}>{error}</p>
             )}
 
             <form
@@ -86,6 +175,97 @@ export default function BookPage() {
               className="card"
               style={{ display: "grid", gap: 16 }}
             >
+              <label>
+                Service Type *
+                <select
+                  className="input"
+                  value={serviceType}
+                  onChange={(e) => setServiceType(e.target.value)}
+                  required
+                >
+                  <option value="">Select a service...</option>
+                  {SERVICE_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </label>
+
+              <div>
+                <label style={{ display: "block", marginBottom: 8 }}>
+                  Choose a date *
+                </label>
+                {loadingSlots ? (
+                  <p style={{ color: "var(--color-muted)" }}>Loading availability...</p>
+                ) : availableDays.length === 0 ? (
+                  <p style={{ color: "var(--color-muted)" }}>No availability in the next 30 days. Please check back soon.</p>
+                ) : (
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {availableDays.map((d) => {
+                      const isSelected = d.date === selectedDate;
+                      return (
+                        <button
+                          key={d.date}
+                          type="button"
+                          onClick={() => {
+                            setSelectedDate(d.date);
+                            setSelectedSlot(null);
+                          }}
+                          style={{
+                            padding: "8px 12px",
+                            borderRadius: 8,
+                            border: `1px solid ${isSelected ? "var(--color-primary)" : "var(--color-border)"}`,
+                            background: isSelected ? "rgba(37,99,235,0.15)" : "transparent",
+                            color: "var(--color-text)",
+                            cursor: "pointer",
+                            fontSize: 13,
+                          }}
+                        >
+                          {formatDateLabel(d.date)}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {selectedDay && (
+                <div>
+                  <label style={{ display: "block", marginBottom: 8 }}>
+                    Available time slots *
+                  </label>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {selectedDay.slots.map((slot) => {
+                      const isSelected =
+                        selectedSlot?.startAt === slot.startAt;
+                      return (
+                        <button
+                          key={slot.startAt}
+                          type="button"
+                          disabled={!slot.available}
+                          onClick={() => setSelectedSlot(slot)}
+                          style={{
+                            padding: "8px 12px",
+                            borderRadius: 8,
+                            border: `1px solid ${isSelected ? "var(--color-primary)" : "var(--color-border)"}`,
+                            background: isSelected
+                              ? "rgba(37,99,235,0.15)"
+                              : slot.available
+                                ? "transparent"
+                                : "rgba(255,255,255,0.04)",
+                            color: slot.available ? "var(--color-text)" : "var(--color-muted)",
+                            cursor: slot.available ? "pointer" : "not-allowed",
+                            opacity: slot.available ? 1 : 0.5,
+                            fontSize: 13,
+                          }}
+                        >
+                          {formatTime(slot.startAt)}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-2">
                 <label>
                   Name *
@@ -130,7 +310,7 @@ export default function BookPage() {
                 <label>
                   Bedrooms *
                   <select className="input" name="homeSize" required>
-                    <option value="">Select one…</option>
+                    <option value="">Select one...</option>
                     <option value="1">1</option>
                     <option value="2">2</option>
                     <option value="3">3</option>
@@ -161,11 +341,11 @@ export default function BookPage() {
 
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || !selectedSlot || !serviceType}
                 className="btn btn-primary"
                 style={{ width: "fit-content" }}
               >
-                {loading ? "Submitting..." : "Submit Booking"}
+                {loading ? "Submitting..." : "Book Appointment"}
               </button>
               <small>* Required fields</small>
             </form>

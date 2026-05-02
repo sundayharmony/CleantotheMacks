@@ -74,12 +74,39 @@ model Booking {
 
   scheduledDate DateTime?
   serviceType   String?
+  slotMinutes   Int?
 
   clientId      String?
   client        Client?  @relation(fields: [clientId], references: [id], onDelete: SetNull)
 
   cleaningJob   CleaningJob?
   videoReleases VideoRelease[]
+
+  @@index([scheduledDate])
+  @@index([status])
+}
+
+model AvailabilityConfig {
+  id           String   @id @default(cuid())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  dayOfWeek    Int      @unique
+  startTime    String
+  endTime      String
+  slotMinutes  Int      @default(60)
+  enabled      Boolean  @default(true)
+}
+
+model BlockedSlot {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  startAt   DateTime
+  endAt     DateTime
+  reason    String?
+
+  @@index([startAt, endAt])
 }
 
 model VideoRelease {

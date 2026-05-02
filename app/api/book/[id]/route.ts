@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/db";
+import { notifyBookingCanceled } from "@/lib/email";
 
 export const runtime = "nodejs"; // ensure Prisma runs in Node (not Edge)
 
@@ -102,10 +103,29 @@ export async function PATCH(req: Request, context: any) {
       return NextResponse.json({ error: "No fields to update" }, { status: 400 });
     }
 
+    const existing = await prisma.booking.findUnique({
+      where: { id },
+      select: { status: true, name: true, email: true, scheduledDate: true },
+    });
+
     const updated = await prisma.booking.update({
       where: { id },
       data,
     });
+
+    if (
+      existing &&
+      data.status === "CANCELED" &&
+      existing.status !== "CANCELED"
+    ) {
+      notifyBookingCanceled({
+        clientName: existing.name,
+        clientEmail: existing.email,
+        scheduledDate: existing.scheduledDate
+          ? existing.scheduledDate.toLocaleString()
+          : null,
+      }).catch(() => {});
+    }
 
     return NextResponse.json({ success: true, booking: updated });
   } catch (err) {

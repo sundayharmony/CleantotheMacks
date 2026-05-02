@@ -225,6 +225,34 @@ export async function notifyAdminJobCompleted(data: {
   });
 }
 
+/** Sent to a client when their appointment is canceled */
+export async function notifyBookingCanceled(data: {
+  clientName: string;
+  clientEmail: string;
+  scheduledDate?: string | null;
+  reason?: string | null;
+}) {
+  const safeName = escapeHtml(data.clientName);
+  const safeDate = data.scheduledDate ? escapeHtml(data.scheduledDate) : null;
+  const safeReason = data.reason ? escapeHtml(data.reason) : null;
+
+  await sendEmail({
+    to: data.clientEmail,
+    subject: "Appointment Canceled - Clean to the Macks",
+    html: wrap(`
+      <h2 style="color: #111; font-size: 18px;">Hi ${safeName},</h2>
+      <p style="color: #374151; line-height: 1.6;">
+        Your appointment with Clean to the Macks has been canceled.
+      </p>
+      ${safeDate ? `<p style="color: #374151; line-height: 1.6;"><strong>Original time:</strong> ${safeDate}</p>` : ""}
+      ${safeReason ? `<div style="background: #f9fafb; padding: 16px; border-radius: 8px; margin: 16px 0;"><p style="margin: 0;"><strong>Reason:</strong> ${safeReason}</p></div>` : ""}
+      <p style="color: #374151; line-height: 1.6;">
+        Need to rebook? Visit our booking page to choose a new time, or just reply to this email.
+      </p>
+    `),
+  });
+}
+
 /** Sent to a client when a video release needs signature */
 export async function notifyVideoReleaseRequest(data: {
   clientName: string;
