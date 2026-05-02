@@ -20,6 +20,29 @@ async function resolveParams(context: any): Promise<{ id?: string }> {
   return resolved && typeof resolved === "object" ? resolved : {};
 }
 
+/** Some deployments omit or reshape `context.params`; the id still appears in the URL path. */
+function bookingIdFromRequest(
+  req: Request,
+  routeParams: { id?: string },
+  body: { id?: string },
+): string | null {
+  const fromRoute = routeParams?.id;
+  if (typeof fromRoute === "string" && fromRoute.length > 0) return fromRoute;
+  const fromBody = body?.id;
+  if (typeof fromBody === "string" && fromBody.length > 0) return fromBody;
+  try {
+    const url = new URL(req.url);
+    const segments = url.pathname.split("/").filter(Boolean);
+    const i = segments.indexOf("book");
+    if (i >= 0 && segments[i + 1]) {
+      return decodeURIComponent(segments[i + 1]);
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function PATCH(req: Request, context: any) {
   try {
@@ -43,7 +66,7 @@ export async function PATCH(req: Request, context: any) {
       scheduledDate?: string | null;
       serviceType?: string | null;
     };
-    const id = routeParams?.id ?? body.id;
+    const id = bookingIdFromRequest(req, routeParams, body);
 
     if (!id || typeof id !== "string") {
       return NextResponse.json({ error: "Missing booking id" }, { status: 400 });
@@ -155,9 +178,25 @@ export async function PATCH(req: Request, context: any) {
       if (err.code === "P2025") {
         return NextResponse.json({ error: "Booking not found" }, { status: 404 });
       }
+      if (err.code === "P2022") {
+        return NextResponse.json(
+          {
+            error:
+              "Database is missing a column your app expects. On your host/Vercel, run: npx prisma migrate deploy (with production DATABASE_URL).",
+          },
+          { status: 503 },
+        );
+      }
+      console.error("[PATCH booking] Prisma meta:", err.code, err.meta);
     }
+    const hint =
+      err instanceof Error && /column|does not exist|relation/i.test(err.message)
+        ? " Database may need migrations: npx prisma migrate deploy."
+        : "";
     return NextResponse.json(
-      { error: "Save failed on the server. If this keeps happening, run database migrations or check logs." },
+      {
+        error: `Save failed on the server.${hint} If this continues, check Vercel/host logs for the exact error.`,
+      },
       { status: 500 },
     );
   }

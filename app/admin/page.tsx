@@ -403,6 +403,7 @@ function BookingsTab({ bookings, setBookings, cleaners, clients, reload }: {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          id: selected.id,
           name: draft.name,
           email: draft.email,
           phone: draft.phone,
