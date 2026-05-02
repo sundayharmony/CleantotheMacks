@@ -168,6 +168,19 @@ function fmtDate(d: string | null) {
   try { return new Date(d).toLocaleDateString(); } catch { return d; }
 }
 
+/** For `<input type="datetime-local" />` in the browser's local timezone */
+function toDatetimeLocalValue(iso: string | null | undefined): string {
+  if (!iso) return "";
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "";
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  } catch {
+    return "";
+  }
+}
+
 function money(n: number | null | undefined) {
   if (n == null) return "—";
   return "$" + n.toFixed(2);
@@ -322,7 +335,7 @@ export default function AdminPage() {
           <>
             {tab === "dashboard" && <DashboardTab bookings={bookings} clients={clients} jobs={jobs} testimonials={testimonials} setTab={setTab} />}
             {tab === "bookings" && <BookingsTab bookings={bookings} setBookings={setBookings} cleaners={cleaners} clients={clients} reload={loadAll} />}
-            {tab === "schedule" && <ScheduleTab bookings={bookings} reload={loadAll} />}
+            {tab === "schedule" && <ScheduleTab bookings={bookings} reload={loadAll} setTab={setTab} />}
             {tab === "clients" && <ClientsTab clients={clients} setClients={setClients} reload={loadAll} />}
             {tab === "cleaners" && <CleanersTab cleaners={cleaners} setCleaners={setCleaners} reload={loadAll} />}
             {tab === "jobs" && <JobsTab jobs={jobs} setJobs={setJobs} bookings={bookings} cleaners={cleaners} reload={loadAll} />}
@@ -359,7 +372,7 @@ function BookingsTab({ bookings, setBookings, cleaners, clients, reload }: {
       .filter((r) => {
         if (filter !== "ALL" && r.status !== filter) return false;
         if (!query) return true;
-        return [r.name, r.email, r.phone ?? "", r.address, r.homeSize, r.sqft ?? "", r.notes ?? "", r.status]
+        return [r.name, r.email, r.phone ?? "", r.address, r.homeSize, r.sqft ?? "", r.notes ?? "", r.status, r.scheduledDate ?? ""]
           .join(" ").toLowerCase().includes(query);
       })
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -375,6 +388,7 @@ function BookingsTab({ bookings, setBookings, cleaners, clients, reload }: {
       name: b.name, email: b.email, phone: b.phone ?? "", address: b.address,
       homeSize: b.homeSize, sqft: b.sqft ?? "", notes: b.notes ?? "",
       status: b.status, clientId: b.clientId ?? "", serviceType: b.serviceType ?? "",
+      scheduledDate: toDatetimeLocalValue(b.scheduledDate),
     });
   }
   function close() { if (!saving) { setSelectedId(null); } }
@@ -383,9 +397,16 @@ function BookingsTab({ bookings, setBookings, cleaners, clients, reload }: {
     if (!selected) return;
     setSaving(true);
     try {
+      const scheduledDatePatch =
+        draft.scheduledDate?.trim() ? new Date(draft.scheduledDate).toISOString() : null;
       const res = await fetch(`/api/book/${selected.id}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...draft, sqft: draft.sqft, clientId: draft.clientId || null }),
+        body: JSON.stringify({
+          ...draft,
+          sqft: draft.sqft,
+          clientId: draft.clientId || null,
+          scheduledDate: scheduledDatePatch,
+        }),
       });
       if (!res.ok) throw new Error("Save failed");
       await reload();
@@ -461,7 +482,7 @@ function BookingsTab({ bookings, setBookings, cleaners, clients, reload }: {
           <table className="admin-table">
             <thead>
               <tr>
-                <th>Date</th><th>Name</th><th>Email</th><th>Phone</th>
+                <th>Submitted</th><th>Scheduled</th><th>Name</th><th>Email</th><th>Phone</th>
                 <th>Address</th><th>Bedrooms</th><th>Status</th><th>Cleaner</th><th>Actions</th>
               </tr>
             </thead>
@@ -471,6 +492,9 @@ function BookingsTab({ bookings, setBookings, cleaners, clients, reload }: {
                 return (
                   <tr key={b.id} style={{ cursor: "pointer" }} onClick={() => openBooking(b)}>
                     <td style={{ whiteSpace: "nowrap" }}>{fmtDate(b.createdAt)}</td>
+                    <td style={{ whiteSpace: "nowrap", fontSize: 13 }}>
+                      {b.scheduledDate ? fmt(b.scheduledDate) : <span style={{ opacity: 0.5 }}>—</span>}
+                    </td>
                     <td>{b.name}</td>
                     <td><span style={{ color: "var(--color-secondary)" }}>{b.email}</span></td>
                     <td>{b.phone || <span style={{ opacity: 0.5 }}>—</span>}</td>
@@ -549,9 +573,22 @@ function BookingsTab({ bookings, setBookings, cleaners, clients, reload }: {
                   <option value="deep_clean">Deep Clean</option>
                   <option value="move_in">Move-In/Out</option>
                   <option value="recurring">Recurring</option>
+                  <option value="painting">Interior Painting</option>
                 </select>
               </label>
             </div>
+            <label>
+              Appointment date &amp; time (optional)
+              <input
+                type="datetime-local"
+                className="input"
+                value={draft.scheduledDate ?? ""}
+                onChange={(e) => setDraft({ ...draft, scheduledDate: e.target.value })}
+              />
+              <small style={{ display: "block", marginTop: 6, opacity: 0.75, fontSize: 12 }}>
+                Fills the Schedule calendar and list. Requests submitted before scheduling launched have no date—set one here, or leave blank.
+              </small>
+            </label>
             <label>Address<input className="input" value={draft.address ?? ""} onChange={(e) => setDraft({ ...draft, address: e.target.value })} /></label>
             <label>Notes<textarea className="input" rows={3} value={draft.notes ?? ""} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} /></label>
 
@@ -1912,9 +1949,10 @@ function GalleryTab({ gallery, setGallery, reload }: {
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const DAY_LABELS_LONG = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
-function ScheduleTab({ bookings, reload }: {
+function ScheduleTab({ bookings, reload, setTab }: {
   bookings: Booking[];
   reload: () => Promise<void>;
+  setTab: (t: Tab) => void;
 }) {
   const [view, setView] = useState<"calendar" | "list" | "availability" | "blocked">("calendar");
   const [monthCursor, setMonthCursor] = useState<Date>(() => {
@@ -1993,6 +2031,11 @@ function ScheduleTab({ bookings, reload }: {
       .filter((b) => b.scheduledDate)
       .sort((a, b) => new Date(a.scheduledDate!).getTime() - new Date(b.scheduledDate!).getTime());
   }, [bookings]);
+
+  const legacyWithoutAppointmentTime = useMemo(
+    () => bookings.filter((b) => !b.scheduledDate).length,
+    [bookings],
+  );
 
   function shiftMonth(delta: number) {
     setMonthCursor(new Date(monthStart.getFullYear(), monthStart.getMonth() + delta, 1));
@@ -2087,6 +2130,45 @@ function ScheduleTab({ bookings, reload }: {
 
   return (
     <>
+      <div
+        className="card"
+        style={{
+          marginBottom: 16,
+          padding: "14px 16px",
+          borderLeft: "4px solid var(--color-primary)",
+          fontSize: 14,
+          lineHeight: 1.55,
+        }}
+      >
+        <strong style={{ display: "block", marginBottom: 6 }}>Where did my bookings go?</strong>
+        <span style={{ opacity: 0.9 }}>
+          Nothing was deleted. This &quot;Schedule&quot; area only shows appointments that have a{" "}
+          <strong>date and time</strong>. Older requests (or manual entries) without that still appear under{" "}
+          <button
+            type="button"
+            onClick={() => setTab("bookings")}
+            style={{
+              background: "none",
+              border: "none",
+              padding: 0,
+              color: "var(--color-secondary)",
+              textDecoration: "underline",
+              cursor: "pointer",
+              font: "inherit",
+            }}
+          >
+            Bookings
+          </button>
+          . Open a booking there and set &quot;Appointment date &amp; time&quot; if you want it on this calendar.
+        </span>
+        {legacyWithoutAppointmentTime > 0 && (
+          <p style={{ margin: "10px 0 0", opacity: 0.85 }}>
+            You have <strong>{legacyWithoutAppointmentTime}</strong> booking
+            {legacyWithoutAppointmentTime === 1 ? "" : "s"} without a scheduled time (shown only on Bookings).
+          </p>
+        )}
+      </div>
+
       <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
         {(["calendar", "list", "availability", "blocked"] as const).map((v) => (
           <button
