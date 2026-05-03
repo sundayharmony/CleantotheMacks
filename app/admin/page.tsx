@@ -1,12 +1,109 @@
 "use client";
 
-import { useEffect, useMemo, useState, useCallback, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
+import { generateSlotsForDate, formatSlotLabel, DEFAULT_AVAILABILITY } from "@/lib/scheduling";
 
 /* ─── Shared Types ─── */
 
 type BookingStatus = "NEW" | "CONFIRMED" | "COMPLETED" | "CANCELED";
 type JobStatus = "assigned" | "in_progress" | "completed" | "cancelled";
 type Tab = "dashboard" | "bookings" | "schedule" | "clients" | "cleaners" | "jobs" | "testimonials" | "gallery" | "videoReleases";
+
+const TAB_META: Record<Tab, { title: string; subtitle: string }> = {
+  dashboard: {
+    title: "Dashboard",
+    subtitle: "Overview of today, upcoming work, and activity",
+  },
+  bookings: {
+    title: "Bookings",
+    subtitle: "Search, filter, and manage customer requests",
+  },
+  schedule: {
+    title: "Schedule",
+    subtitle: "Calendar, agenda, availability, and blocked time",
+  },
+  clients: { title: "Clients", subtitle: "Customer profiles and visit history" },
+  cleaners: { title: "Cleaners", subtitle: "Team members and pay settings" },
+  jobs: { title: "Jobs", subtitle: "Assignments, time tracking, and pay" },
+  testimonials: { title: "Testimonials", subtitle: "Reviews shown on the website" },
+  gallery: { title: "Gallery", subtitle: "Before & after photo pairs" },
+  videoReleases: {
+    title: "Video Releases",
+    subtitle: "Electronic signature requests",
+  },
+};
+
+function NavIcon({ tab }: { tab: Tab }) {
+  const cls = "icon";
+  switch (tab) {
+    case "dashboard":
+      return (
+        <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M4 19V9M10 19V5M16 19v-6M22 19V12" strokeLinecap="round" />
+        </svg>
+      );
+    case "bookings":
+      return (
+        <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <rect x="3" y="5" width="18" height="16" rx="2" />
+          <path d="M8 3v4M16 3v4M3 11h18" strokeLinecap="round" />
+        </svg>
+      );
+    case "schedule":
+      return (
+        <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <rect x="3" y="4" width="18" height="17" rx="2" />
+          <path d="M16 2v4M8 2v4M3 10h18" strokeLinecap="round" />
+        </svg>
+      );
+    case "clients":
+      return (
+        <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2" />
+          <circle cx="9" cy="7" r="4" />
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" strokeLinecap="round" />
+        </svg>
+      );
+    case "cleaners":
+      return (
+        <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+          <circle cx="9" cy="7" r="4" />
+          <path d="M22 21v-2a4 4 0 0 0-3-3.87" strokeLinecap="round" />
+          <path d="M16 3.13a4 4 0 0 1 0 7.75" strokeLinecap="round" />
+        </svg>
+      );
+    case "jobs":
+      return (
+        <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <path d="M14 2v6h6M10 12h8M10 16h8" strokeLinecap="round" />
+        </svg>
+      );
+    case "testimonials":
+      return (
+        <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z" strokeLinecap="round" />
+        </svg>
+      );
+    case "gallery":
+      return (
+        <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <rect x="3" y="3" width="18" height="18" rx="2" />
+          <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor" stroke="none" />
+          <path d="M21 15l-5-5L5 21" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      );
+    case "videoReleases":
+      return (
+        <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M15 10l4.553-2.276A1 1 0 0 1 21 8.618v6.764a1 1 0 0 1-1.447.894L15 14M5 18h8a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2z" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      );
+    default:
+      return null;
+  }
+}
 
 type Booking = {
   id: string;
@@ -186,36 +283,236 @@ function money(n: number | null | undefined) {
   return "$" + n.toFixed(2);
 }
 
-function statusBadge(status: string) {
-  const s: Record<string, React.CSSProperties> = {
-    NEW: { border: "1px solid var(--color-border)", color: "var(--color-text)", background: "rgba(255,255,255,0.06)" },
-    CONFIRMED: { border: "1px solid rgba(88,166,255,0.5)", color: "var(--color-secondary)", background: "rgba(88,166,255,0.12)" },
-    COMPLETED: { border: "1px solid rgba(34,197,94,0.4)", color: "#86efac", background: "rgba(34,197,94,0.12)" },
-    CANCELED: { border: "1px solid rgba(239,68,68,0.4)", color: "#fca5a5", background: "rgba(239,68,68,0.12)" },
-    assigned: { border: "1px solid var(--color-border)", color: "var(--color-text)", background: "rgba(255,255,255,0.06)" },
-    in_progress: { border: "1px solid rgba(251,191,36,0.5)", color: "#fde68a", background: "rgba(251,191,36,0.12)" },
-    completed: { border: "1px solid rgba(34,197,94,0.4)", color: "#86efac", background: "rgba(34,197,94,0.12)" },
-    cancelled: { border: "1px solid rgba(239,68,68,0.4)", color: "#fca5a5", background: "rgba(239,68,68,0.12)" },
-  };
-  return s[status] ?? s.NEW;
+function useNarrowLayout(maxWidth = 900) {
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${maxWidth}px)`);
+    const fn = () => setNarrow(mq.matches);
+    fn();
+    mq.addEventListener("change", fn);
+    return () => mq.removeEventListener("change", fn);
+  }, [maxWidth]);
+  return narrow;
 }
 
-const pillStyle = (status: string): React.CSSProperties => ({
-  fontSize: 12, padding: "4px 10px", borderRadius: 999, fontWeight: 600, ...statusBadge(status),
-});
+function initialsFromName(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  return name.slice(0, 2).toUpperCase() || "?";
+}
+
+function avatarHue(seed: string) {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h + seed.charCodeAt(i) * (i + 1)) % 360;
+  return h;
+}
+
+function pillClassForStatus(status: string): string {
+  switch (status) {
+    case "NEW":
+    case "assigned":
+      return "pill-new";
+    case "CONFIRMED":
+    case "PENDING":
+      return "pill-confirmed";
+    case "COMPLETED":
+    case "completed":
+    case "SIGNED":
+      return "pill-completed";
+    case "CANCELED":
+    case "cancelled":
+      return "pill-canceled";
+    case "EXPIRED":
+      return "pill-warning";
+    case "in_progress":
+      return "pill-active";
+    default:
+      return "pill-neutral";
+  }
+}
+
+function StatusBadge({
+  status,
+  label,
+  className,
+}: {
+  status: string;
+  label?: string;
+  className?: string;
+}) {
+  return (
+    <span className={`pill ${pillClassForStatus(status)}${className ? ` ${className}` : ""}`}>
+      {label ?? status}
+    </span>
+  );
+}
+
+function KpiCard({
+  label,
+  value,
+  foot,
+  tone,
+  onClick,
+  isStatic,
+}: {
+  label: React.ReactNode;
+  value: React.ReactNode;
+  foot?: React.ReactNode;
+  tone?: "primary" | "warning" | "success" | "info";
+  onClick?: () => void;
+  isStatic?: boolean;
+}) {
+  const toneClass = tone ? ` kpi-tone-${tone}` : "";
+  const cls = `kpi-card${isStatic ? " static" : ""}${toneClass}`;
+  const inner = (
+    <>
+      <span className="kpi-label">{label}</span>
+      <span className="kpi-value">{value}</span>
+      {foot ? <span className="kpi-foot">{foot}</span> : null}
+    </>
+  );
+  if (onClick && !isStatic) {
+    return (
+      <button type="button" className={cls} onClick={onClick}>
+        {inner}
+      </button>
+    );
+  }
+  return <div className={cls}>{inner}</div>;
+}
+
+function RowAction({
+  children,
+  href,
+  onClick,
+  variant = "default",
+  disabled,
+  type = "button",
+}: {
+  children: React.ReactNode;
+  href?: string;
+  onClick?: (e: React.MouseEvent) => void;
+  variant?: "default" | "primary" | "success" | "danger";
+  disabled?: boolean;
+  type?: "button" | "submit";
+}) {
+  const v =
+    variant === "primary"
+      ? "row-action-primary"
+      : variant === "success"
+        ? "row-action-success"
+        : variant === "danger"
+          ? "row-action-danger"
+          : "";
+  const cls = `row-action ${v}`.trim();
+  if (href) {
+    return (
+      <a href={href} className={cls} target="_blank" rel="noreferrer" onClick={onClick}>
+        {children}
+      </a>
+    );
+  }
+  return (
+    <button type={type} className={cls} onClick={onClick} disabled={disabled}>
+      {children}
+    </button>
+  );
+}
+
+function SectionHeader({
+  title,
+  subtitle,
+  actions,
+}: {
+  title: string;
+  subtitle?: string;
+  actions?: React.ReactNode;
+}) {
+  return (
+    <div className="section-head">
+      <div>
+        <h1>{title}</h1>
+        {subtitle ? <p className="subtitle">{subtitle}</p> : null}
+      </div>
+      {actions ? <div className="actions">{actions}</div> : null}
+    </div>
+  );
+}
+
+function EmptyState({
+  title,
+  hint,
+  action,
+}: {
+  title: string;
+  hint?: string;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div className="empty-state">
+      <h3>{title}</h3>
+      {hint ? <p>{hint}</p> : null}
+      {action}
+    </div>
+  );
+}
+
+function Toolbar({
+  children,
+  loose,
+  className,
+}: {
+  children: React.ReactNode;
+  loose?: boolean;
+  className?: string;
+}) {
+  const cls = ["toolbar", loose ? "toolbar-loose" : "", className ?? ""].filter(Boolean).join(" ");
+  return <div className={cls}>{children}</div>;
+}
+
+function SplitPane({ children }: { children: React.ReactNode }) {
+  return <div className="split-pane">{children}</div>;
+}
+
+function Avatar({ name, small }: { name: string; small?: boolean }) {
+  const bg = `hsl(${avatarHue(name)} 48% 44%)`;
+  return (
+    <div className={small ? "avatar avatar-sm" : "avatar"} style={{ background: bg }}>
+      {initialsFromName(name)}
+    </div>
+  );
+}
+
+function startOfWeekMonday(d: Date) {
+  const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const day = x.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  x.setDate(x.getDate() + diff);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+
+function addDays(d: Date, n: number) {
+  const x = new Date(d);
+  x.setDate(x.getDate() + n);
+  return x;
+}
+
+function sameCalendarDay(a: Date, b: Date) {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
 
 /* ─── Modal Overlay ─── */
 
 function Modal({ open, onClose, children }: { open: boolean; onClose: () => void; children: React.ReactNode }) {
   if (!open) return null;
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      onClick={onClose}
-      style={{ position: "fixed", inset: 0, background: "rgba(2,6,23,0.72)", display: "grid", placeItems: "center", padding: 16, zIndex: 1000 }}
-    >
-      <div className="card" onClick={(e) => e.stopPropagation()} style={{ width: "min(920px,96vw)", maxHeight: "88vh", overflowY: "auto", display: "grid", gap: 14 }}>
+    <div role="dialog" aria-modal="true" className="modal-overlay" onClick={onClose}>
+      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
         {children}
       </div>
     </div>
@@ -224,8 +521,21 @@ function Modal({ open, onClose, children }: { open: boolean; onClose: () => void
 
 /* ─── MAIN COMPONENT ─── */
 
+const ADMIN_TAB_ORDER: Tab[] = [
+  "dashboard",
+  "bookings",
+  "schedule",
+  "clients",
+  "cleaners",
+  "jobs",
+  "testimonials",
+  "gallery",
+  "videoReleases",
+];
+
 export default function AdminPage() {
   const [tab, setTab] = useState<Tab>("dashboard");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Data
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -249,6 +559,11 @@ export default function AdminPage() {
   }
 
   const openBooking = bookings.find((b) => b.id === openBookingId) ?? null;
+
+  const pendingNewCount = useMemo(
+    () => bookings.filter((b) => b.status === "NEW").length,
+    [bookings],
+  );
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -302,60 +617,167 @@ export default function AdminPage() {
     window.location.href = "/admin/login";
   }
 
+  const tc = TAB_META[tab];
+
   return (
-    <section className="section">
-      <div className="container container-wide">
-        {/* Header */}
-        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 16, marginBottom: 8 }}>
-          <h1 style={{ fontSize: 32, margin: 0 }}>Admin Dashboard</h1>
-          <div style={{ display: "flex", gap: 10 }}>
-            <button onClick={loadAll} className="btn btn-outline" style={{ padding: "8px 14px", fontSize: 14 }}>Refresh</button>
-            <button onClick={logout} className="btn btn-outline" style={{ padding: "8px 14px", fontSize: 14 }}>Logout</button>
+    <>
+      <div className="admin-mobile-bar">
+        <button
+          type="button"
+          className="admin-hamburger"
+          onClick={() => setSidebarOpen(true)}
+          aria-label="Open navigation"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M4 6h16M4 12h16M4 18h16" strokeLinecap="round" />
+          </svg>
+        </button>
+        <span style={{ fontWeight: 700, fontSize: 15 }}>{tc.title}</span>
+        <button type="button" className="btn btn-ghost btn-sm" onClick={loadAll}>
+          Refresh
+        </button>
+      </div>
+
+      {sidebarOpen ? (
+        <div
+          className="admin-backdrop"
+          onClick={() => setSidebarOpen(false)}
+          aria-hidden
+        />
+      ) : null}
+
+      <div className="admin-layout">
+        <aside className={`admin-sidebar${sidebarOpen ? " open" : ""}`}>
+          <div className="admin-brand">
+            <div className="admin-brand-mark">CT</div>
+            <div>
+              <div className="admin-brand-name">Clean to the Macks</div>
+              <div className="admin-brand-sub">Admin</div>
+            </div>
           </div>
-        </div>
-
-        {/* Tabs */}
-        <div className="tab-nav">
-          {(["dashboard", "bookings", "schedule", "clients", "cleaners", "jobs", "testimonials", "gallery", "videoReleases"] as Tab[]).map((t) => (
-            <button key={t} className={`tab-btn${tab === t ? " active" : ""}`} onClick={() => setTab(t)}>
-              {t === "dashboard"
-                ? "Dashboard"
-                : t === "bookings"
-                  ? "Bookings"
-                  : t === "schedule"
-                    ? "Schedule"
-                    : t === "clients"
-                      ? "Clients"
-                      : t === "cleaners"
-                        ? "Cleaners"
-                        : t === "jobs"
-                          ? "Jobs"
-                          : t === "testimonials"
-                            ? "Testimonials"
-                            : t === "gallery"
-                              ? "Gallery"
-                              : "Video Releases"}
+          <nav className="admin-nav" aria-label="Primary">
+            {ADMIN_TAB_ORDER.map((t) => (
+              <button
+                key={t}
+                type="button"
+                className={`admin-nav-item${tab === t ? " active" : ""}`}
+                onClick={() => {
+                  setTab(t);
+                  setSidebarOpen(false);
+                }}
+              >
+                <NavIcon tab={t} />
+                {TAB_META[t].title}
+                {t === "bookings" && pendingNewCount > 0 ? (
+                  <span className="badge">{pendingNewCount}</span>
+                ) : null}
+              </button>
+            ))}
+          </nav>
+          <div className="admin-sidebar-footer">
+            <button
+              type="button"
+              className="btn btn-outline btn-block btn-sm"
+              onClick={() => {
+                loadAll();
+                setSidebarOpen(false);
+              }}
+            >
+              Refresh data
             </button>
-          ))}
-        </div>
+            <button type="button" className="btn btn-outline btn-block btn-sm" onClick={logout}>
+              Log out
+            </button>
+          </div>
+        </aside>
 
-        {loading ? (
-          <p style={{ opacity: 0.75 }}>Loading…</p>
-        ) : err ? (
-          <p style={{ color: "tomato" }}>{err}</p>
-        ) : (
-          <>
-            {tab === "dashboard" && <DashboardTab bookings={bookings} clients={clients} jobs={jobs} testimonials={testimonials} setTab={setTab} jumpToBookingsFiltered={jumpToBookingsFiltered} onOpenBooking={setOpenBookingId} />}
-            {tab === "bookings" && <BookingsTab bookings={bookings} cleaners={cleaners} onOpenBooking={setOpenBookingId} initialFilter={bookingsInitialFilter} clearInitialFilter={() => setBookingsInitialFilter("ALL")} />}
-            {tab === "schedule" && <ScheduleTab bookings={bookings} cleaners={cleaners} reload={loadAll} setTab={setTab} onOpenBooking={setOpenBookingId} />}
-            {tab === "clients" && <ClientsTab clients={clients} setClients={setClients} reload={loadAll} />}
-            {tab === "cleaners" && <CleanersTab cleaners={cleaners} setCleaners={setCleaners} reload={loadAll} />}
-            {tab === "jobs" && <JobsTab jobs={jobs} setJobs={setJobs} bookings={bookings} cleaners={cleaners} reload={loadAll} />}
-            {tab === "testimonials" && <TestimonialsTab testimonials={testimonials} setTestimonials={setTestimonials} reload={loadAll} />}
-            {tab === "gallery" && <GalleryTab gallery={gallery} setGallery={setGallery} reload={loadAll} />}
-            {tab === "videoReleases" && <VideoReleasesTab videoReleases={videoReleases} bookings={bookings} reload={loadAll} />}
-          </>
-        )}
+        <main className="admin-main">
+          <SectionHeader
+            title={tc.title}
+            subtitle={tc.subtitle}
+            actions={
+              <div className="row">
+                <button type="button" className="btn btn-outline btn-sm" onClick={loadAll}>
+                  Refresh
+                </button>
+                <button type="button" className="btn btn-outline btn-sm" onClick={logout}>
+                  Log out
+                </button>
+              </div>
+            }
+          />
+
+          {loading ? (
+            <p className="text-muted">Loading…</p>
+          ) : err ? (
+            <div className="alert alert-danger">{err}</div>
+          ) : (
+            <>
+              {tab === "dashboard" && (
+                <DashboardTab
+                  bookings={bookings}
+                  clients={clients}
+                  jobs={jobs}
+                  testimonials={testimonials}
+                  videoReleases={videoReleases}
+                  setTab={setTab}
+                  jumpToBookingsFiltered={jumpToBookingsFiltered}
+                  onOpenBooking={setOpenBookingId}
+                />
+              )}
+              {tab === "bookings" && (
+                <BookingsTab
+                  bookings={bookings}
+                  cleaners={cleaners}
+                  onOpenBooking={setOpenBookingId}
+                  initialFilter={bookingsInitialFilter}
+                  clearInitialFilter={() => setBookingsInitialFilter("ALL")}
+                />
+              )}
+              {tab === "schedule" && (
+                <ScheduleTab
+                  bookings={bookings}
+                  cleaners={cleaners}
+                  reload={loadAll}
+                  setTab={setTab}
+                  onOpenBooking={setOpenBookingId}
+                />
+              )}
+              {tab === "clients" && (
+                <ClientsTab clients={clients} setClients={setClients} reload={loadAll} />
+              )}
+              {tab === "cleaners" && (
+                <CleanersTab cleaners={cleaners} setCleaners={setCleaners} reload={loadAll} />
+              )}
+              {tab === "jobs" && (
+                <JobsTab
+                  jobs={jobs}
+                  setJobs={setJobs}
+                  bookings={bookings}
+                  cleaners={cleaners}
+                  reload={loadAll}
+                />
+              )}
+              {tab === "testimonials" && (
+                <TestimonialsTab
+                  testimonials={testimonials}
+                  setTestimonials={setTestimonials}
+                  reload={loadAll}
+                />
+              )}
+              {tab === "gallery" && (
+                <GalleryTab gallery={gallery} setGallery={setGallery} reload={loadAll} />
+              )}
+              {tab === "videoReleases" && (
+                <VideoReleasesTab
+                  videoReleases={videoReleases}
+                  bookings={bookings}
+                  reload={loadAll}
+                />
+              )}
+            </>
+          )}
+        </main>
       </div>
 
       <BookingDetailModal
@@ -366,7 +788,7 @@ export default function AdminPage() {
         onSaved={loadAll}
         onDeleted={(id) => setBookings((prev) => prev.filter((r) => r.id !== id))}
       />
-    </section>
+    </>
   );
 }
 
@@ -521,12 +943,12 @@ function BookingDetailModal({
     <Modal open={!!booking} onClose={close}>
       {booking && (
         <>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", gap: 16 }}>
+          <div className="modal-head">
             <div>
-              <h2 style={{ margin: 0, fontSize: 24 }}>Booking Details</h2>
-              <p style={{ marginTop: 4, opacity: 0.75, fontSize: 14 }}>Created: {fmt(booking.createdAt)}</p>
+              <h2>Booking Details</h2>
+              <p className="subtitle">Created: {fmt(booking.createdAt)}</p>
             </div>
-            <button className="btn btn-outline" onClick={close} style={{ padding: "6px 14px", fontSize: 13 }}>Close</button>
+            <button type="button" className="btn btn-outline btn-sm" onClick={close}>Close</button>
           </div>
 
           <div className="grid grid-2">
@@ -565,7 +987,7 @@ function BookingDetailModal({
               value={draft.scheduledDate ?? ""}
               onChange={(e) => setDraft({ ...draft, scheduledDate: e.target.value })}
             />
-            <small style={{ display: "block", marginTop: 6, opacity: 0.75, fontSize: 12 }}>
+            <small style={{ display: "block", marginTop: 6 }}>
               Fills the Schedule calendar and list. Requests submitted before scheduling launched have no date—set one here, or leave blank.
             </small>
           </label>
@@ -586,7 +1008,7 @@ function BookingDetailModal({
           )}
 
           {!booking.cleaningJob && (
-            <div style={{ borderTop: "1px solid var(--color-border)", paddingTop: 14 }}>
+            <div style={{ borderTop: "1px solid var(--admin-border)", paddingTop: 14 }}>
               <label>Assign Cleaner
                 <select className="input" defaultValue="" onChange={(e) => { if (e.target.value) assignCleaner(booking.id, e.target.value); }}>
                   <option value="" disabled>Select a cleaner…</option>
@@ -596,17 +1018,18 @@ function BookingDetailModal({
             </div>
           )}
 
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-            <button className="btn btn-outline" onClick={deleteBooking} disabled={saving} style={{ borderColor: "rgba(239,68,68,0.5)", color: "#fca5a5" }}>Delete Booking</button>
-            <div style={{ display: "flex", gap: 10, marginLeft: "auto", flexWrap: "wrap" }}>
+          <div className="modal-foot">
+            <button type="button" className="btn btn-danger-outline" onClick={deleteBooking} disabled={saving}>Delete Booking</button>
+            <div className="modal-foot-actions">
               <button
+                type="button"
                 className="btn btn-outline"
                 onClick={() => sendVideoRelease(booking)}
                 disabled={sendingRelease}
               >
                 {sendingRelease ? "Sending..." : "Send Video Release"}
               </button>
-              <button className="btn btn-primary" onClick={save} disabled={saving}>{saving ? "Saving…" : "Save Changes"}</button>
+              <button type="button" className="btn btn-primary" onClick={save} disabled={saving}>{saving ? "Saving…" : "Save Changes"}</button>
             </div>
           </div>
         </>
@@ -653,6 +1076,21 @@ function BookingsTab({ bookings, cleaners, onOpenBooking, initialFilter, clearIn
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }, [bookings, filter, q]);
 
+  const statusCounts = useMemo(() => {
+    const m: Record<BookingStatus, number> = {
+      NEW: 0,
+      CONFIRMED: 0,
+      COMPLETED: 0,
+      CANCELED: 0,
+    };
+    for (const b of bookings) {
+      if (b.status in m) m[b.status as BookingStatus]++;
+    }
+    return m;
+  }, [bookings]);
+
+  const [denseTable, setDenseTable] = useState(false);
+
   async function sendVideoRelease(booking: Booking) {
     setSendingRelease(true);
     try {
@@ -678,73 +1116,127 @@ function BookingsTab({ bookings, cleaners, onOpenBooking, initialFilter, clearIn
     }
   }
 
+  const chipOpts: { key: "ALL" | BookingStatus; label: string }[] = [
+    { key: "ALL", label: "All" },
+    { key: "NEW", label: "NEW" },
+    { key: "CONFIRMED", label: "Confirmed" },
+    { key: "COMPLETED", label: "Completed" },
+    { key: "CANCELED", label: "Canceled" },
+  ];
+
   return (
     <>
-      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 16 }}>
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search bookings…"
-          style={{ width: 300, maxWidth: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid var(--color-border)", background: "var(--color-surface)", color: "var(--color-text)", outline: "none" }} />
-        <select value={filter} onChange={(e) => setFilter(e.target.value as "ALL" | BookingStatus)}
-          style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid var(--color-border)", background: "var(--color-surface)", color: "var(--color-text)" }}>
-          <option value="ALL">All statuses</option>
-          <option value="NEW">NEW</option>
-          <option value="CONFIRMED">CONFIRMED</option>
-          <option value="COMPLETED">COMPLETED</option>
-          <option value="CANCELED">CANCELED</option>
-        </select>
-        <span style={{ opacity: 0.75, fontSize: 14 }}>Showing <b>{filtered.length}</b> of <b>{bookings.length}</b></span>
+      <div className="toolbar" style={{ marginBottom: 12 }}>
+        <label style={{ margin: 0, maxWidth: 320, flex: "1 1 220px" }}>
+          <span className="text-muted" style={{ fontSize: 11 }}>
+            Search
+          </span>
+          <input
+            className="input input-search"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search bookings…"
+          />
+        </label>
+        <span className="toolbar-spacer" />
+        <button
+          type="button"
+          className="btn btn-outline btn-sm"
+          onClick={() => setDenseTable((v) => !v)}
+          aria-pressed={denseTable}
+        >
+          {denseTable ? "Comfortable rows" : "Compact rows"}
+        </button>
+        <span className="meta">
+          Showing <strong>{filtered.length}</strong> of <strong>{bookings.length}</strong>
+        </span>
       </div>
 
-      {filtered.length === 0 ? <p style={{ opacity: 0.75 }}>No bookings found.</p> : (
+      <div className="chip-row" style={{ marginBottom: 14 }}>
+        {chipOpts.map(({ key: k, label }) => (
+          <button
+            key={k}
+            type="button"
+            className={`chip${filter === k ? " active" : ""}`}
+            onClick={() => setFilter(k)}
+          >
+            {label}
+            <span className="chip-count">
+              {k === "ALL" ? bookings.length : statusCounts[k as BookingStatus]}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      {filtered.length === 0 ? (
+        <EmptyState title="No bookings match" hint="Try changing filters or search." />
+      ) : (
         <div className="admin-table-wrap">
-          <table className="admin-table">
+          <table
+            className={`admin-table table-sticky-head${denseTable ? " table-compact" : ""}`}
+          >
             <thead>
               <tr>
-                <th>Submitted</th><th>Scheduled</th><th>Name</th><th>Email</th><th>Phone</th>
-                <th>Address</th><th>Bedrooms</th><th>Status</th><th>Cleaner</th><th>Actions</th>
+                <th>Submitted</th>
+                <th>Scheduled</th>
+                <th>Client</th>
+                <th>Address</th>
+                <th>BR</th>
+                <th>Status</th>
+                <th>Cleaner</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((b) => {
-                const assignedCleaner = b.cleaningJob ? cleaners.find((c) => c.id === b.cleaningJob?.cleanerId)?.name : null;
+                const assignedCleaner = b.cleaningJob
+                  ? cleaners.find((c) => c.id === b.cleaningJob?.cleanerId)?.name
+                  : null;
                 return (
                   <tr key={b.id} style={{ cursor: "pointer" }} onClick={() => onOpenBooking(b.id)}>
-                    <td style={{ whiteSpace: "nowrap" }}>{fmtDate(b.createdAt)}</td>
-                    <td style={{ whiteSpace: "nowrap", fontSize: 13 }}>
-                      {b.scheduledDate ? fmt(b.scheduledDate) : <span style={{ opacity: 0.5 }}>—</span>}
+                    <td className="nowrap">{fmtDate(b.createdAt)}</td>
+                    <td className="nowrap" style={{ fontSize: 13 }}>
+                      {b.scheduledDate ? (
+                        fmt(b.scheduledDate)
+                      ) : (
+                        <span className="text-subtle">—</span>
+                      )}
                     </td>
-                    <td>{b.name}</td>
-                    <td><span style={{ color: "var(--color-secondary)" }}>{b.email}</span></td>
-                    <td>{b.phone || <span style={{ opacity: 0.5 }}>—</span>}</td>
+                    <td>
+                      <div className="name-cell">
+                        <strong>{b.name}</strong>
+                        <div className="secondary">
+                          <span>{b.email}</span>
+                          {b.phone ? <span>{b.phone}</span> : null}
+                        </div>
+                      </div>
+                    </td>
                     <td>{b.address}</td>
                     <td>{b.homeSize}</td>
-                    <td><span style={pillStyle(b.status)}>{b.status}</span></td>
-                    <td>{assignedCleaner || <span style={{ opacity: 0.5 }}>Unassigned</span>}</td>
                     <td>
-                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                        <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(b.address)}`}
-                          onClick={(e) => e.stopPropagation()} target="_blank" rel="noreferrer"
-                          style={{ display: "inline-block", padding: "4px 10px", borderRadius: 8, border: "1px solid var(--color-border)", color: "var(--color-text)", textDecoration: "none", fontSize: 13 }}>
+                      <StatusBadge status={b.status} />
+                    </td>
+                    <td>
+                      {assignedCleaner || <span className="text-subtle">Unassigned</span>}
+                    </td>
+                    <td onClick={(e) => e.stopPropagation()}>
+                      <div className="row" style={{ gap: 6 }}>
+                        <RowAction
+                          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(b.address)}`}
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           Map
-                        </a>
-                        <button
+                        </RowAction>
+                        <RowAction
+                          variant="primary"
                           onClick={(e) => {
                             e.stopPropagation();
                             sendVideoRelease(b);
                           }}
                           disabled={sendingRelease}
-                          style={{
-                            display: "inline-block",
-                            padding: "4px 10px",
-                            borderRadius: 8,
-                            border: "1px solid var(--color-border)",
-                            color: "var(--color-text)",
-                            background: "transparent",
-                            fontSize: 13,
-                            cursor: sendingRelease ? "wait" : "pointer",
-                          }}
                         >
                           {sendingRelease ? "Sending..." : "Send Release"}
-                        </button>
+                        </RowAction>
                       </div>
                     </td>
                   </tr>
@@ -754,7 +1246,6 @@ function BookingsTab({ bookings, cleaners, onOpenBooking, initialFilter, clearIn
           </table>
         </div>
       )}
-
     </>
   );
 }
@@ -768,6 +1259,7 @@ function ClientsTab({ clients, setClients, reload }: {
   setClients: React.Dispatch<React.SetStateAction<Client[]>>;
   reload: () => Promise<void>;
 }) {
+  const narrow = useNarrowLayout();
   const [q, setQ] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -840,113 +1332,159 @@ function ClientsTab({ clients, setClients, reload }: {
     return completed.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]?.createdAt;
   }
 
-  return (
+  const detailOpen = creating || !!selected;
+  const showModal = narrow && detailOpen;
+  const showPane = !narrow && detailOpen;
+
+  const formBody = (
     <>
-      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 16 }}>
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search clients…"
-          style={{ width: 300, maxWidth: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid var(--color-border)", background: "var(--color-surface)", color: "var(--color-text)", outline: "none" }} />
-        <button className="btn btn-primary" onClick={startCreate} style={{ padding: "10px 16px", fontSize: 14 }}>+ Add Client</button>
-        <span style={{ opacity: 0.75, fontSize: 14 }}>{filtered.length} clients</span>
+      <div className="grid grid-2">
+        <label>Name *<input className="input" value={draft.name ?? ""} onChange={(e) => setDraft({ ...draft, name: e.target.value })} /></label>
+        <label>Email *<input className="input" type="email" value={draft.email ?? ""} onChange={(e) => setDraft({ ...draft, email: e.target.value })} /></label>
+        <label>Phone<input className="input" value={draft.phone ?? ""} onChange={(e) => setDraft({ ...draft, phone: e.target.value })} /></label>
+        <label>Address *<input className="input" value={draft.address ?? ""} onChange={(e) => setDraft({ ...draft, address: e.target.value })} /></label>
+        <label>Preferred Day
+          <select className="input" value={draft.preferredDay ?? ""} onChange={(e) => setDraft({ ...draft, preferredDay: e.target.value })}>
+            <option value="">—</option>
+            {["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"].map((d) => <option key={d} value={d}>{d}</option>)}
+          </select>
+        </label>
+        <label>Preferred Time
+          <select className="input" value={draft.preferredTime ?? ""} onChange={(e) => setDraft({ ...draft, preferredTime: e.target.value })}>
+            <option value="">—</option><option value="morning">Morning</option><option value="afternoon">Afternoon</option><option value="evening">Evening</option>
+          </select>
+        </label>
       </div>
 
-      {filtered.length === 0 ? <p style={{ opacity: 0.75 }}>No clients found.</p> : (
-        <div className="admin-table-wrap">
-          <table className="admin-table">
-            <thead>
-              <tr><th>Name</th><th>Email</th><th>Phone</th><th>Address</th><th>Last Visit</th><th>Visits</th><th>Lifetime Spend</th><th>Referral</th></tr>
-            </thead>
-            <tbody>
-              {filtered.map((c) => (
-                <tr key={c.id} style={{ cursor: "pointer" }} onClick={() => openClient(c)}>
-                  <td>{c.name}</td>
-                  <td><span style={{ color: "var(--color-secondary)" }}>{c.email}</span></td>
-                  <td>{c.phone || <span style={{ opacity: 0.5 }}>—</span>}</td>
-                  <td>{c.address}</td>
-                  <td style={{ whiteSpace: "nowrap" }}>{fmtDate(lastVisit(c))}</td>
-                  <td>{c.bookings.length}</td>
-                  <td>{money(lifetimeSpend(c))}</td>
-                  <td>{c.referralSource || <span style={{ opacity: 0.5 }}>—</span>}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <label>Special Instructions<textarea className="input" rows={2} value={draft.specialInstructions ?? ""} onChange={(e) => setDraft({ ...draft, specialInstructions: e.target.value })} /></label>
+
+      <div className="grid grid-2">
+        <label>Pets<input className="input" value={draft.pets ?? ""} onChange={(e) => setDraft({ ...draft, pets: e.target.value })} placeholder="e.g. 2 cats, 1 dog" /></label>
+        <label>Access Codes<input className="input" value={draft.accessCodes ?? ""} onChange={(e) => setDraft({ ...draft, accessCodes: e.target.value })} placeholder="e.g. Gate: 1234" /></label>
+      </div>
+
+      <label>Communication Notes<textarea className="input" rows={2} value={draft.communicationNotes ?? ""} onChange={(e) => setDraft({ ...draft, communicationNotes: e.target.value })} /></label>
+      <label>Referral Source<input className="input" value={draft.referralSource ?? ""} onChange={(e) => setDraft({ ...draft, referralSource: e.target.value })} placeholder="e.g. Google, Referral from…" /></label>
+
+      {selected && selected.bookings.length > 0 && (
+        <div className="card" style={{ padding: 14 }}>
+          <h3 style={{ fontSize: 14, marginBottom: 10 }}>Visit History ({selected.bookings.length})</h3>
+          <div className="stack" style={{ maxHeight: 200, overflowY: "auto" }}>
+            {selected.bookings.map((b) => (
+              <div key={b.id} className="row" style={{ justifyContent: "space-between", fontSize: 13, padding: "6px 0", borderBottom: "1px solid var(--admin-border)" }}>
+                <span>{fmtDate(b.createdAt)}</span>
+                <StatusBadge status={b.status} />
+                <span>{b.serviceType || "—"}</span>
+                <span>{money(b.cleaningJob?.totalPay)}</span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
-      <Modal open={!!selected || creating} onClose={close}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", gap: 16 }}>
-          <h2 style={{ margin: 0, fontSize: 24 }}>{creating ? "New Client" : "Client Details"}</h2>
-          <button className="btn btn-outline" onClick={close} style={{ padding: "6px 14px", fontSize: 13 }}>Close</button>
-        </div>
-
-        <div className="grid grid-2">
-          <label>Name *<input className="input" value={draft.name ?? ""} onChange={(e) => setDraft({ ...draft, name: e.target.value })} /></label>
-          <label>Email *<input className="input" type="email" value={draft.email ?? ""} onChange={(e) => setDraft({ ...draft, email: e.target.value })} /></label>
-          <label>Phone<input className="input" value={draft.phone ?? ""} onChange={(e) => setDraft({ ...draft, phone: e.target.value })} /></label>
-          <label>Address *<input className="input" value={draft.address ?? ""} onChange={(e) => setDraft({ ...draft, address: e.target.value })} /></label>
-          <label>Preferred Day
-            <select className="input" value={draft.preferredDay ?? ""} onChange={(e) => setDraft({ ...draft, preferredDay: e.target.value })}>
-              <option value="">—</option>
-              {["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"].map((d) => <option key={d} value={d}>{d}</option>)}
-            </select>
-          </label>
-          <label>Preferred Time
-            <select className="input" value={draft.preferredTime ?? ""} onChange={(e) => setDraft({ ...draft, preferredTime: e.target.value })}>
-              <option value="">—</option><option value="morning">Morning</option><option value="afternoon">Afternoon</option><option value="evening">Evening</option>
-            </select>
-          </label>
-        </div>
-
-        <label>Special Instructions<textarea className="input" rows={2} value={draft.specialInstructions ?? ""} onChange={(e) => setDraft({ ...draft, specialInstructions: e.target.value })} /></label>
-
-        <div className="grid grid-2">
-          <label>Pets<input className="input" value={draft.pets ?? ""} onChange={(e) => setDraft({ ...draft, pets: e.target.value })} placeholder="e.g. 2 cats, 1 dog" /></label>
-          <label>Access Codes<input className="input" value={draft.accessCodes ?? ""} onChange={(e) => setDraft({ ...draft, accessCodes: e.target.value })} placeholder="e.g. Gate: 1234" /></label>
-        </div>
-
-        <label>Communication Notes<textarea className="input" rows={2} value={draft.communicationNotes ?? ""} onChange={(e) => setDraft({ ...draft, communicationNotes: e.target.value })} /></label>
-        <label>Referral Source<input className="input" value={draft.referralSource ?? ""} onChange={(e) => setDraft({ ...draft, referralSource: e.target.value })} placeholder="e.g. Google, Referral from…" /></label>
-
-        {/* Visit History (only when editing) */}
-        {selected && selected.bookings.length > 0 && (
-          <div style={{ borderTop: "1px solid var(--color-border)", paddingTop: 14 }}>
-            <h3 style={{ fontSize: 16, marginBottom: 10 }}>Visit History ({selected.bookings.length})</h3>
-            <div style={{ display: "grid", gap: 8, maxHeight: 200, overflowY: "auto" }}>
-              {selected.bookings.map((b) => (
-                <div key={b.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", background: "var(--color-surface-2)", borderRadius: 8, fontSize: 13 }}>
-                  <span>{fmtDate(b.createdAt)}</span>
-                  <span style={pillStyle(b.status)}>{b.status}</span>
-                  <span>{b.serviceType || "—"}</span>
-                  <span>{money(b.cleaningJob?.totalPay)}</span>
+      {selected && selected.satisfactionNotes.length > 0 && (
+        <div className="card" style={{ padding: 14 }}>
+          <h3 style={{ fontSize: 14, marginBottom: 10 }}>Satisfaction Notes</h3>
+          <div className="stack">
+            {selected.satisfactionNotes.map((n) => (
+              <div key={n.id} style={{ padding: "8px 12px", background: "var(--admin-surface-2)", borderRadius: 8, fontSize: 13 }}>
+                <div className="row" style={{ justifyContent: "space-between" }}>
+                  <span>{fmtDate(n.createdAt)}</span>
+                  {n.rating ? <span>{`${"★".repeat(n.rating)}${"☆".repeat(5 - n.rating)}`}</span> : null}
+                  {n.followUpRequired ? <span style={{ color: "var(--admin-warning)" }}>Follow-up needed</span> : null}
                 </div>
-              ))}
-            </div>
+                {n.notes ? <p style={{ marginTop: 4 }}>{n.notes}</p> : null}
+              </div>
+            ))}
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Satisfaction Notes */}
-        {selected && selected.satisfactionNotes.length > 0 && (
-          <div style={{ borderTop: "1px solid var(--color-border)", paddingTop: 14 }}>
-            <h3 style={{ fontSize: 16, marginBottom: 10 }}>Satisfaction Notes</h3>
-            <div style={{ display: "grid", gap: 8 }}>
-              {selected.satisfactionNotes.map((n) => (
-                <div key={n.id} style={{ padding: "8px 12px", background: "var(--color-surface-2)", borderRadius: 8, fontSize: 13 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between" }}>
-                    <span>{fmtDate(n.createdAt)}</span>
-                    {n.rating && <span>{"★".repeat(n.rating)}{"☆".repeat(5 - n.rating)}</span>}
-                    {n.followUpRequired && <span style={{ color: "#fde68a" }}>Follow-up needed</span>}
+      <div className="pane-detail-actions">
+        {!creating ? (
+          <button type="button" className="btn btn-danger btn-sm" onClick={deleteClient} disabled={saving}>
+            Delete Client
+          </button>
+        ) : (
+          <span />
+        )}
+        <button type="button" className="btn btn-primary" onClick={save} disabled={saving}>
+          {saving ? "Saving…" : creating ? "Create Client" : "Save Changes"}
+        </button>
+      </div>
+    </>
+  );
+
+  return (
+    <>
+      <Toolbar loose>
+        <label className="toolbar-field">
+          <span className="text-muted" style={{ fontSize: 11 }}>Search</span>
+          <input className="input input-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search clients…" />
+        </label>
+        <button type="button" className="btn btn-primary btn-sm" onClick={startCreate}>+ Add Client</button>
+        <span className="toolbar-spacer" />
+        <span className="meta">{filtered.length} clients</span>
+      </Toolbar>
+
+      <SplitPane>
+        <div className="pane-list">
+          <div className="pane-list-head">
+            <strong style={{ fontSize: 13 }}>Directory</strong>
+            <span className="text-muted" style={{ fontSize: 12 }}>{filtered.length} shown</span>
+          </div>
+          <div className="pane-list-body">
+            {filtered.length === 0 ? (
+              <div style={{ padding: 16 }}>
+                <EmptyState title="No clients found" hint="Try a different search or add a client." />
+              </div>
+            ) : (
+              filtered.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  className={`pane-row${selectedId === c.id && !creating ? " selected" : ""}`}
+                  onClick={() => openClient(c)}
+                >
+                  <Avatar name={c.name} small />
+                  <div className="pane-row-body">
+                    <div className="pane-row-name">{c.name}</div>
+                    <div className="pane-row-secondary">{c.email}</div>
                   </div>
-                  {n.notes && <p style={{ marginTop: 4, opacity: 0.85 }}>{n.notes}</p>}
-                </div>
-              ))}
-            </div>
+                  <div className="pane-row-meta">{money(lifetimeSpend(c))}</div>
+                </button>
+              ))
+            )}
           </div>
-        )}
-
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-          {!creating && <button className="btn btn-outline" onClick={deleteClient} disabled={saving} style={{ borderColor: "rgba(239,68,68,0.5)", color: "#fca5a5" }}>Delete Client</button>}
-          <button className="btn btn-primary" onClick={save} disabled={saving} style={{ marginLeft: "auto" }}>{saving ? "Saving…" : creating ? "Create Client" : "Save Changes"}</button>
         </div>
+
+        {showPane ? (
+          <div className="pane-detail modal-on-mobile">
+            <div className="pane-detail-head">
+              <div>
+                <h2>{creating ? "New Client" : "Client Details"}</h2>
+                {!creating && selected ? <p className="subtitle">{selected.email}</p> : null}
+              </div>
+              <button type="button" className="btn btn-outline btn-sm" onClick={close}>Close</button>
+            </div>
+            {formBody}
+          </div>
+        ) : !narrow ? (
+          <div className="pane-detail modal-on-mobile" style={{ alignItems: "center", justifyContent: "center" }}>
+            <EmptyState title="Select a client" hint="Choose someone from the list or create a new client." />
+          </div>
+        ) : null}
+      </SplitPane>
+
+      <Modal open={showModal} onClose={close}>
+        <div className="modal-head">
+          <div>
+            <h2>{creating ? "New Client" : "Client Details"}</h2>
+            {!creating && selected ? <p className="subtitle">{selected.email}</p> : null}
+          </div>
+          <button type="button" className="btn btn-outline btn-sm" onClick={close}>Close</button>
+        </div>
+        {formBody}
       </Modal>
     </>
   );
@@ -961,6 +1499,7 @@ function CleanersTab({ cleaners, setCleaners, reload }: {
   setCleaners: React.Dispatch<React.SetStateAction<Cleaner[]>>;
   reload: () => Promise<void>;
 }) {
+  const narrow = useNarrowLayout();
   const [q, setQ] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -1031,83 +1570,129 @@ function CleanersTab({ cleaners, setCleaners, reload }: {
       .reduce((sum, j) => sum + (j.totalPay ?? 0), 0);
   }
 
-  return (
+  const detailOpen = creating || !!selected;
+  const showModal = narrow && detailOpen;
+  const showPane = !narrow && detailOpen;
+
+  const formBody = (
     <>
-      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 16 }}>
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search cleaners…"
-          style={{ width: 300, maxWidth: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid var(--color-border)", background: "var(--color-surface)", color: "var(--color-text)", outline: "none" }} />
-        <button className="btn btn-primary" onClick={startCreate} style={{ padding: "10px 16px", fontSize: 14 }}>+ Add Cleaner</button>
-        <span style={{ opacity: 0.75, fontSize: 14 }}>{filtered.length} cleaners</span>
+      <div className="grid grid-2">
+        <label>Name *<input className="input" value={draft.name ?? ""} onChange={(e) => setDraft({ ...draft, name: e.target.value })} /></label>
+        <label>Email *<input className="input" type="email" value={draft.email ?? ""} onChange={(e) => setDraft({ ...draft, email: e.target.value })} /></label>
+        <label>Phone *<input className="input" value={draft.phone ?? ""} onChange={(e) => setDraft({ ...draft, phone: e.target.value })} /></label>
+        <label>Address<input className="input" value={draft.address ?? ""} onChange={(e) => setDraft({ ...draft, address: e.target.value })} /></label>
       </div>
 
-      {filtered.length === 0 ? <p style={{ opacity: 0.75 }}>No cleaners found.</p> : (
-        <div className="admin-table-wrap">
-          <table className="admin-table">
-            <thead>
-              <tr><th>Name</th><th>Email</th><th>Phone</th><th>Pay Type</th><th>Rate</th><th>Active Jobs</th><th>This Month</th></tr>
-            </thead>
-            <tbody>
-              {filtered.map((c) => (
-                <tr key={c.id} style={{ cursor: "pointer" }} onClick={() => openCleaner(c)}>
-                  <td>{c.name}</td>
-                  <td><span style={{ color: "var(--color-secondary)" }}>{c.email}</span></td>
-                  <td>{c.phone}</td>
-                  <td><span style={pillStyle(c.paymentType === "hourly" ? "CONFIRMED" : "NEW")}>{c.paymentType === "hourly" ? "Hourly" : "Per Job"}</span></td>
-                  <td>{c.paymentType === "hourly" ? `$${c.hourlyRate}/hr` : "—"}</td>
-                  <td>{activeJobs(c)}</td>
-                  <td>{money(monthlyEarnings(c))}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <div className="grid grid-2">
+        <label>Payment Type
+          <select className="input" value={draft.paymentType ?? "hourly"} onChange={(e) => setDraft({ ...draft, paymentType: e.target.value })}>
+            <option value="hourly">Hourly</option>
+            <option value="per_job">Per Job</option>
+          </select>
+        </label>
+        {draft.paymentType === "hourly" && (
+          <label>Hourly Rate ($) *<input className="input" type="number" step="0.01" min="0" value={draft.hourlyRate ?? ""} onChange={(e) => setDraft({ ...draft, hourlyRate: e.target.value })} /></label>
+        )}
+      </div>
+
+      {selected && selected.cleaningJobs.length > 0 && (
+        <div className="card" style={{ padding: 14 }}>
+          <h3 style={{ fontSize: 14, marginBottom: 10 }}>Job History ({selected.cleaningJobs.length})</h3>
+          <div className="stack" style={{ maxHeight: 200, overflowY: "auto" }}>
+            {selected.cleaningJobs.map((j) => (
+              <div key={j.id} className="row" style={{ justifyContent: "space-between", fontSize: 13, padding: "6px 0", borderBottom: "1px solid var(--admin-border)" }}>
+                <span>{fmtDate(j.createdAt)}</span>
+                <StatusBadge status={j.status} />
+                <span>{money(j.totalPay)}</span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
-      <Modal open={!!selected || creating} onClose={close}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", gap: 16 }}>
-          <h2 style={{ margin: 0, fontSize: 24 }}>{creating ? "New Cleaner" : "Cleaner Details"}</h2>
-          <button className="btn btn-outline" onClick={close} style={{ padding: "6px 14px", fontSize: 13 }}>Close</button>
-        </div>
-
-        <div className="grid grid-2">
-          <label>Name *<input className="input" value={draft.name ?? ""} onChange={(e) => setDraft({ ...draft, name: e.target.value })} /></label>
-          <label>Email *<input className="input" type="email" value={draft.email ?? ""} onChange={(e) => setDraft({ ...draft, email: e.target.value })} /></label>
-          <label>Phone *<input className="input" value={draft.phone ?? ""} onChange={(e) => setDraft({ ...draft, phone: e.target.value })} /></label>
-          <label>Address<input className="input" value={draft.address ?? ""} onChange={(e) => setDraft({ ...draft, address: e.target.value })} /></label>
-        </div>
-
-        <div className="grid grid-2">
-          <label>Payment Type
-            <select className="input" value={draft.paymentType ?? "hourly"} onChange={(e) => setDraft({ ...draft, paymentType: e.target.value })}>
-              <option value="hourly">Hourly</option>
-              <option value="per_job">Per Job</option>
-            </select>
-          </label>
-          {draft.paymentType === "hourly" && (
-            <label>Hourly Rate ($) *<input className="input" type="number" step="0.01" min="0" value={draft.hourlyRate ?? ""} onChange={(e) => setDraft({ ...draft, hourlyRate: e.target.value })} /></label>
-          )}
-        </div>
-
-        {/* Job History (only when editing) */}
-        {selected && selected.cleaningJobs.length > 0 && (
-          <div style={{ borderTop: "1px solid var(--color-border)", paddingTop: 14 }}>
-            <h3 style={{ fontSize: 16, marginBottom: 10 }}>Job History ({selected.cleaningJobs.length})</h3>
-            <div style={{ display: "grid", gap: 8, maxHeight: 200, overflowY: "auto" }}>
-              {selected.cleaningJobs.map((j) => (
-                <div key={j.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", background: "var(--color-surface-2)", borderRadius: 8, fontSize: 13 }}>
-                  <span>{fmtDate(j.createdAt)}</span>
-                  <span style={pillStyle(j.status)}>{j.status}</span>
-                  <span>{money(j.totalPay)}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+      <div className="pane-detail-actions">
+        {!creating ? (
+          <button type="button" className="btn btn-danger btn-sm" onClick={deleteCleaner} disabled={saving}>Delete Cleaner</button>
+        ) : (
+          <span />
         )}
+        <button type="button" className="btn btn-primary" onClick={save} disabled={saving}>
+          {saving ? "Saving…" : creating ? "Create Cleaner" : "Save Changes"}
+        </button>
+      </div>
+    </>
+  );
 
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-          {!creating && <button className="btn btn-outline" onClick={deleteCleaner} disabled={saving} style={{ borderColor: "rgba(239,68,68,0.5)", color: "#fca5a5" }}>Delete Cleaner</button>}
-          <button className="btn btn-primary" onClick={save} disabled={saving} style={{ marginLeft: "auto" }}>{saving ? "Saving…" : creating ? "Create Cleaner" : "Save Changes"}</button>
+  return (
+    <>
+      <Toolbar loose>
+        <label className="toolbar-field">
+          <span className="text-muted" style={{ fontSize: 11 }}>Search</span>
+          <input className="input input-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search cleaners…" />
+        </label>
+        <button type="button" className="btn btn-primary btn-sm" onClick={startCreate}>+ Add Cleaner</button>
+        <span className="toolbar-spacer" />
+        <span className="meta">{filtered.length} cleaners</span>
+      </Toolbar>
+
+      <SplitPane>
+        <div className="pane-list">
+          <div className="pane-list-head">
+            <strong style={{ fontSize: 13 }}>Team</strong>
+            <span className="text-muted" style={{ fontSize: 12 }}>{filtered.length} shown</span>
+          </div>
+          <div className="pane-list-body">
+            {filtered.length === 0 ? (
+              <div style={{ padding: 16 }}>
+                <EmptyState title="No cleaners" hint="Add your first team member." />
+              </div>
+            ) : (
+              filtered.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  className={`pane-row${selectedId === c.id && !creating ? " selected" : ""}`}
+                  onClick={() => openCleaner(c)}
+                >
+                  <Avatar name={c.name} small />
+                  <div className="pane-row-body">
+                    <div className="pane-row-name">{c.name}</div>
+                    <div className="pane-row-secondary">{c.paymentType === "hourly" ? `Hourly · $${c.hourlyRate}/hr` : "Per job"}</div>
+                  </div>
+                  <div className="pane-row-meta">{activeJobs(c)} active</div>
+                </button>
+              ))
+            )}
+          </div>
         </div>
+
+        {showPane ? (
+          <div className="pane-detail modal-on-mobile">
+            <div className="pane-detail-head">
+              <div>
+                <h2>{creating ? "New Cleaner" : "Cleaner Details"}</h2>
+                {!creating && selected ? <p className="subtitle">{selected.email}</p> : null}
+              </div>
+              <button type="button" className="btn btn-outline btn-sm" onClick={close}>Close</button>
+            </div>
+            {formBody}
+          </div>
+        ) : !narrow ? (
+          <div className="pane-detail modal-on-mobile" style={{ alignItems: "center", justifyContent: "center" }}>
+            <EmptyState title="Select a cleaner" hint="Pick someone from the list or add a new cleaner." />
+          </div>
+        ) : null}
+      </SplitPane>
+
+      <Modal open={showModal} onClose={close}>
+        <div className="modal-head">
+          <div>
+            <h2>{creating ? "New Cleaner" : "Cleaner Details"}</h2>
+            {!creating && selected ? <p className="subtitle">{selected.email}</p> : null}
+          </div>
+          <button type="button" className="btn btn-outline btn-sm" onClick={close}>Close</button>
+        </div>
+        {formBody}
       </Modal>
     </>
   );
@@ -1117,6 +1702,39 @@ function CleanersTab({ cleaners, setCleaners, reload }: {
    JOBS TAB
    ════════════════════════════════════════════════════════════════ */
 
+function JobProgressStrip({
+  status,
+  saving,
+  onGo,
+}: {
+  status: string;
+  saving: boolean;
+  onGo: (s: JobStatus) => void;
+}) {
+  const order: JobStatus[] = ["assigned", "in_progress", "completed"];
+  if (status === "cancelled") {
+    return <div className="alert alert-danger">This job is cancelled.</div>;
+  }
+  const idx = order.indexOf(status as JobStatus);
+  return (
+    <div className="status-strip" role="group" aria-label="Job progress">
+      {order.map((s, i) => (
+        <button
+          key={s}
+          type="button"
+          disabled={saving}
+          className={
+            status === s ? "current" : idx >= 0 && i < idx ? "done" : ""
+          }
+          onClick={() => onGo(s)}
+        >
+          {s.replace("_", " ")}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function JobsTab({ jobs, setJobs, bookings, cleaners, reload }: {
   jobs: Job[];
   setJobs: React.Dispatch<React.SetStateAction<Job[]>>;
@@ -1124,6 +1742,7 @@ function JobsTab({ jobs, setJobs, bookings, cleaners, reload }: {
   cleaners: Cleaner[];
   reload: () => Promise<void>;
 }) {
+  const narrow = useNarrowLayout();
   const [filter, setFilter] = useState<"ALL" | JobStatus>("ALL");
   const [q, setQ] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -1239,160 +1858,257 @@ function JobsTab({ jobs, setJobs, bookings, cleaners, reload }: {
     } catch { alert("Delete failed"); }
   }
 
+  async function goJobStatus(next: JobStatus) {
+    if (!selected || saving) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/job/${selected.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cleanerId: draft.cleanerId,
+          status: next,
+          flatRateAmount: draft.flatRateAmount ? parseFloat(draft.flatRateAmount) : null,
+          completionNotes: draft.completionNotes,
+          totalPay: draft.totalPay ? parseFloat(draft.totalPay) : null,
+        }),
+      });
+      if (!res.ok) throw new Error("Update failed");
+      setDraft((d) => ({ ...d, status: next }));
+      await reload();
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : "Update failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   // Stats
   const totalPay = jobs.filter((j) => j.status === "completed").reduce((s, j) => s + (j.totalPay ?? 0), 0);
   const activeCount = jobs.filter((j) => j.status === "assigned" || j.status === "in_progress").length;
   const completedCount = jobs.filter((j) => j.status === "completed").length;
 
-  return (
+  const detailOpen = creating || !!selected;
+  const showModal = narrow && detailOpen;
+  const showPane = !narrow && detailOpen;
+
+  const createForm = (
     <>
-      <div className="stat-row">
-        <div className="stat-card"><strong>{activeCount}</strong><small>Active Jobs</small></div>
-        <div className="stat-card"><strong>{completedCount}</strong><small>Completed</small></div>
-        <div className="stat-card"><strong>{money(totalPay)}</strong><small>Total Paid</small></div>
-        <div className="stat-card"><strong>{unassignedBookings.length}</strong><small>Unassigned Bookings</small></div>
+      <div className="grid grid-2">
+        <label>
+          Booking *
+          <select className="input" value={draft.bookingId ?? ""} onChange={(e) => setDraft({ ...draft, bookingId: e.target.value })}>
+            <option value="" disabled>Select booking…</option>
+            {unassignedBookings.map((b) => (
+              <option key={b.id} value={b.id}>{b.name} — {b.address}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Cleaner *
+          <select className="input" value={draft.cleanerId ?? ""} onChange={(e) => setDraft({ ...draft, cleanerId: e.target.value })}>
+            <option value="" disabled>Select cleaner…</option>
+            {cleaners.map((c) => (
+              <option key={c.id} value={c.id}>{c.name} — {c.paymentType === "hourly" ? `$${c.hourlyRate}/hr` : "Per job"}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <label>
+        Flat Rate Amount (for per-job pay)
+        <input
+          className="input"
+          type="number"
+          step="0.01"
+          min="0"
+          value={draft.flatRateAmount ?? ""}
+          onChange={(e) => setDraft({ ...draft, flatRateAmount: e.target.value })}
+          placeholder="Leave empty for hourly"
+        />
+      </label>
+      <div className="modal-foot">
+        <button type="button" className="btn btn-outline" onClick={close}>Cancel</button>
+        <button type="button" className="btn btn-primary" onClick={save} disabled={saving}>
+          {saving ? "Assigning…" : "Assign Job"}
+        </button>
+      </div>
+    </>
+  );
+
+  const editForm = selected ? (
+    <>
+      <JobProgressStrip status={selected.status} saving={saving} onGo={goJobStatus} />
+      <div className="info-block">
+        <h3>Booking</h3>
+        <div className="info-grid">
+          <span><b>Client:</b> {selected.booking.name}</span>
+          <span><b>Address:</b> {selected.booking.address}</span>
+          <span><b>Size:</b> {selected.booking.homeSize} BR / {selected.booking.sqft ?? "—"} sqft</span>
+          <span><b>Scheduled:</b> {fmtDate(selected.booking.scheduledDate)}</span>
+        </div>
       </div>
 
-      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 16 }}>
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search jobs…"
-          style={{ width: 300, maxWidth: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid var(--color-border)", background: "var(--color-surface)", color: "var(--color-text)", outline: "none" }} />
-        <select value={filter} onChange={(e) => setFilter(e.target.value as "ALL" | JobStatus)}
-          style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid var(--color-border)", background: "var(--color-surface)", color: "var(--color-text)" }}>
+      <label>
+        Cleaner
+        <select className="input" value={draft.cleanerId ?? ""} onChange={(e) => setDraft({ ...draft, cleanerId: e.target.value })}>
+          {cleaners.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+      </label>
+
+      <div className="info-block">
+        <h3>Time &amp; Pay</h3>
+        <div className="info-grid">
+          <span><b>Clock In:</b> {fmt(selected.clockInTime)}</span>
+          <span><b>Clock Out:</b> {fmt(selected.clockOutTime)}</span>
+          <span><b>Hours:</b> {hoursWorked(selected) != null ? `${hoursWorked(selected)}h` : "—"}</span>
+          <span><b>Pay Type:</b> {selected.cleaner.paymentType === "hourly" ? `Hourly ($${selected.cleaner.hourlyRate}/hr)` : "Per Job"}</span>
+        </div>
+        <div className="row" style={{ marginTop: 10 }}>
+          {!selected.clockInTime && selected.status === "assigned" && (
+            <button type="button" className="btn btn-primary btn-sm" onClick={clockIn} disabled={saving}>Clock In</button>
+          )}
+          {selected.clockInTime && !selected.clockOutTime && (
+            <button type="button" className="btn btn-primary btn-sm" onClick={clockOut} disabled={saving}>Clock Out</button>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-2">
+        <label>
+          Flat Rate Amount ($)
+          <input className="input" type="number" step="0.01" min="0" value={draft.flatRateAmount ?? ""} onChange={(e) => setDraft({ ...draft, flatRateAmount: e.target.value })} />
+        </label>
+        <label>
+          Total Pay ($) (override)
+          <input className="input" type="number" step="0.01" min="0" value={draft.totalPay ?? ""} onChange={(e) => setDraft({ ...draft, totalPay: e.target.value })} />
+        </label>
+      </div>
+
+      <label>
+        Completion Notes
+        <textarea className="input" rows={2} value={draft.completionNotes ?? ""} onChange={(e) => setDraft({ ...draft, completionNotes: e.target.value })} />
+      </label>
+
+      <div className="row">
+        <button
+          type="button"
+          className="btn btn-outline btn-sm"
+          disabled={saving || selected.status === "cancelled"}
+          onClick={() => {
+            if (window.confirm("Mark this job as cancelled?")) goJobStatus("cancelled");
+          }}
+        >
+          Mark cancelled
+        </button>
+      </div>
+
+      <div className="pane-detail-actions">
+        <button type="button" className="btn btn-danger btn-sm" onClick={deleteJob} disabled={saving}>Delete Job</button>
+        <button type="button" className="btn btn-primary" onClick={save} disabled={saving}>{saving ? "Saving…" : "Save Changes"}</button>
+      </div>
+    </>
+  ) : null;
+
+  return (
+    <>
+      <div className="kpi-grid" style={{ marginBottom: 16 }}>
+        <KpiCard label="Active jobs" value={activeCount} isStatic tone="primary" />
+        <KpiCard label="Completed" value={completedCount} isStatic tone="success" />
+        <KpiCard label="Total paid" value={money(totalPay)} isStatic tone="info" />
+        <KpiCard label="Unassigned bookings" value={unassignedBookings.length} isStatic tone="warning" />
+      </div>
+
+      <Toolbar loose>
+        <label className="toolbar-field" style={{ maxWidth: 280, flex: "1 1 200px" }}>
+          <span className="text-muted" style={{ fontSize: 11 }}>Search</span>
+          <input className="input input-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search jobs…" />
+        </label>
+        <select className="input" style={{ maxWidth: 160 }} value={filter} onChange={(e) => setFilter(e.target.value as "ALL" | JobStatus)}>
           <option value="ALL">All statuses</option>
           <option value="assigned">Assigned</option>
           <option value="in_progress">In Progress</option>
           <option value="completed">Completed</option>
           <option value="cancelled">Cancelled</option>
         </select>
-        <button className="btn btn-primary" onClick={startCreate} style={{ padding: "10px 16px", fontSize: 14 }}>+ Assign Job</button>
-        <span style={{ opacity: 0.75, fontSize: 14 }}>{filtered.length} jobs</span>
-      </div>
+        <button type="button" className="btn btn-primary btn-sm" onClick={startCreate}>+ Assign Job</button>
+        <span className="toolbar-spacer" />
+        <span className="meta">{filtered.length} jobs</span>
+      </Toolbar>
 
-      {filtered.length === 0 ? <p style={{ opacity: 0.75 }}>No jobs found.</p> : (
-        <div className="admin-table-wrap">
-          <table className="admin-table">
-            <thead>
-              <tr><th>Client</th><th>Address</th><th>Cleaner</th><th>Status</th><th>Clock In</th><th>Clock Out</th><th>Hours</th><th>Pay</th></tr>
-            </thead>
-            <tbody>
-              {filtered.map((j) => (
-                <tr key={j.id} style={{ cursor: "pointer" }} onClick={() => openJob(j)}>
-                  <td>{j.booking.name}</td>
-                  <td>{j.booking.address}</td>
-                  <td>{j.cleaner.name}</td>
-                  <td><span style={pillStyle(j.status)}>{j.status}</span></td>
-                  <td style={{ whiteSpace: "nowrap", fontSize: 13 }}>{fmt(j.clockInTime)}</td>
-                  <td style={{ whiteSpace: "nowrap", fontSize: 13 }}>{fmt(j.clockOutTime)}</td>
-                  <td>{hoursWorked(j) != null ? `${hoursWorked(j)}h` : "—"}</td>
-                  <td style={{ fontWeight: 600 }}>{money(j.totalPay)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <SplitPane>
+        <div className="pane-list">
+          <div className="pane-list-head">
+            <strong style={{ fontSize: 13 }}>Assignments</strong>
+            <span className="text-muted" style={{ fontSize: 12 }}>{filtered.length} shown</span>
+          </div>
+          <div className="pane-list-body">
+            {filtered.length === 0 ? (
+              <div style={{ padding: 16 }}>
+                <EmptyState title="No jobs match" hint="Change filters or assign a cleaner to a booking." />
+              </div>
+            ) : (
+              filtered.map((j) => (
+                <button
+                  key={j.id}
+                  type="button"
+                  className={`pane-row${selectedId === j.id && !creating ? " selected" : ""}`}
+                  onClick={() => openJob(j)}
+                >
+                  <Avatar name={j.booking.name} small />
+                  <div className="pane-row-body">
+                    <div className="pane-row-name">{j.booking.name}</div>
+                    <div className="pane-row-secondary">{j.cleaner.name} · {fmtDate(j.booking.scheduledDate)}</div>
+                  </div>
+                  <StatusBadge status={j.status} />
+                </button>
+              ))
+            )}
+          </div>
         </div>
-      )}
 
-      <Modal open={!!selected || creating} onClose={close}>
-        {creating ? (
-          <>
-            <h2 style={{ margin: 0, fontSize: 24 }}>Assign Cleaner to Booking</h2>
-            <div className="grid grid-2">
-              <label>Booking *
-                <select className="input" value={draft.bookingId ?? ""} onChange={(e) => setDraft({ ...draft, bookingId: e.target.value })}>
-                  <option value="" disabled>Select booking…</option>
-                  {unassignedBookings.map((b) => <option key={b.id} value={b.id}>{b.name} — {b.address}</option>)}
-                </select>
-              </label>
-              <label>Cleaner *
-                <select className="input" value={draft.cleanerId ?? ""} onChange={(e) => setDraft({ ...draft, cleanerId: e.target.value })}>
-                  <option value="" disabled>Select cleaner…</option>
-                  {cleaners.map((c) => <option key={c.id} value={c.id}>{c.name} — {c.paymentType === "hourly" ? `$${c.hourlyRate}/hr` : "Per job"}</option>)}
-                </select>
-              </label>
+        {showPane && creating ? (
+          <div className="pane-detail modal-on-mobile">
+            <div className="pane-detail-head">
+              <h2>New assignment</h2>
+              <button type="button" className="btn btn-outline btn-sm" onClick={close}>Close</button>
             </div>
-            <label>Flat Rate Amount (for per-job pay)
-              <input className="input" type="number" step="0.01" min="0" value={draft.flatRateAmount ?? ""} onChange={(e) => setDraft({ ...draft, flatRateAmount: e.target.value })} placeholder="Leave empty for hourly" />
-            </label>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
-              <button className="btn btn-outline" onClick={close}>Cancel</button>
-              <button className="btn btn-primary" onClick={save} disabled={saving}>{saving ? "Assigning…" : "Assign Job"}</button>
-            </div>
-          </>
-        ) : selected && (
-          <>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", gap: 16 }}>
+            {createForm}
+          </div>
+        ) : showPane && selected ? (
+          <div className="pane-detail modal-on-mobile">
+            <div className="pane-detail-head">
               <div>
-                <h2 style={{ margin: 0, fontSize: 24 }}>Job Details</h2>
-                <p style={{ marginTop: 4, opacity: 0.75, fontSize: 14 }}>Created: {fmt(selected.createdAt)}</p>
+                <h2>Job Details</h2>
+                <p className="subtitle">Created {fmt(selected.createdAt)}</p>
               </div>
-              <button className="btn btn-outline" onClick={close} style={{ padding: "6px 14px", fontSize: 13 }}>Close</button>
+              <button type="button" className="btn btn-outline btn-sm" onClick={close}>Close</button>
             </div>
+            {editForm}
+          </div>
+        ) : !narrow ? (
+          <div className="pane-detail modal-on-mobile" style={{ alignItems: "center", justifyContent: "center" }}>
+            <EmptyState title="Select a job" hint="Pick an assignment or create one from an unassigned booking." />
+          </div>
+        ) : null}
+      </SplitPane>
 
-            {/* Booking info */}
-            <div style={{ background: "var(--color-surface-2)", borderRadius: 12, padding: 14 }}>
-              <h3 style={{ fontSize: 14, marginBottom: 8, color: "var(--color-muted)" }}>Booking</h3>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, fontSize: 14 }}>
-                <span><b>Client:</b> {selected.booking.name}</span>
-                <span><b>Address:</b> {selected.booking.address}</span>
-                <span><b>Size:</b> {selected.booking.homeSize} BR / {selected.booking.sqft ?? "—"} sqft</span>
-                <span><b>Scheduled:</b> {fmtDate(selected.booking.scheduledDate)}</span>
-              </div>
-            </div>
+      <Modal open={showModal && creating} onClose={close}>
+        <div className="modal-head">
+          <h2>New assignment</h2>
+          <button type="button" className="btn btn-outline btn-sm" onClick={close}>Close</button>
+        </div>
+        {createForm}
+      </Modal>
 
-            <div className="grid grid-2">
-              <label>Cleaner
-                <select className="input" value={draft.cleanerId ?? ""} onChange={(e) => setDraft({ ...draft, cleanerId: e.target.value })}>
-                  {cleaners.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-              </label>
-              <label>Status
-                <select className="input" value={draft.status ?? "assigned"} onChange={(e) => setDraft({ ...draft, status: e.target.value })}>
-                  <option value="assigned">Assigned</option>
-                  <option value="in_progress">In Progress</option>
-                  <option value="completed">Completed</option>
-                  <option value="cancelled">Cancelled</option>
-                </select>
-              </label>
-            </div>
-
-            {/* Time tracking */}
-            <div style={{ background: "var(--color-surface-2)", borderRadius: 12, padding: 14 }}>
-              <h3 style={{ fontSize: 14, marginBottom: 8, color: "var(--color-muted)" }}>Time & Pay</h3>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, fontSize: 14, marginBottom: 12 }}>
-                <span><b>Clock In:</b> {fmt(selected.clockInTime)}</span>
-                <span><b>Clock Out:</b> {fmt(selected.clockOutTime)}</span>
-                <span><b>Hours:</b> {hoursWorked(selected) != null ? `${hoursWorked(selected)}h` : "—"}</span>
-                <span><b>Pay Type:</b> {selected.cleaner.paymentType === "hourly" ? `Hourly ($${selected.cleaner.hourlyRate}/hr)` : "Per Job"}</span>
-              </div>
-              <div style={{ display: "flex", gap: 10 }}>
-                {!selected.clockInTime && selected.status === "assigned" && (
-                  <button className="btn btn-primary" onClick={clockIn} disabled={saving} style={{ padding: "8px 16px", fontSize: 13 }}>Clock In</button>
-                )}
-                {selected.clockInTime && !selected.clockOutTime && (
-                  <button className="btn btn-primary" onClick={clockOut} disabled={saving} style={{ padding: "8px 16px", fontSize: 13, background: "#16a34a" }}>Clock Out</button>
-                )}
-              </div>
-            </div>
-
-            <div className="grid grid-2">
-              <label>Flat Rate Amount ($)
-                <input className="input" type="number" step="0.01" min="0" value={draft.flatRateAmount ?? ""} onChange={(e) => setDraft({ ...draft, flatRateAmount: e.target.value })} />
-              </label>
-              <label>Total Pay ($) (override)
-                <input className="input" type="number" step="0.01" min="0" value={draft.totalPay ?? ""} onChange={(e) => setDraft({ ...draft, totalPay: e.target.value })} />
-              </label>
-            </div>
-
-            <label>Completion Notes
-              <textarea className="input" rows={2} value={draft.completionNotes ?? ""} onChange={(e) => setDraft({ ...draft, completionNotes: e.target.value })} />
-            </label>
-
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-              <button className="btn btn-outline" onClick={deleteJob} disabled={saving} style={{ borderColor: "rgba(239,68,68,0.5)", color: "#fca5a5" }}>Delete Job</button>
-              <button className="btn btn-primary" onClick={save} disabled={saving}>{saving ? "Saving…" : "Save Changes"}</button>
-            </div>
-          </>
-        )}
+      <Modal open={showModal && !!selected && !creating} onClose={close}>
+        <div className="modal-head">
+          <div>
+            <h2>Job Details</h2>
+            <p className="subtitle">Created {selected ? fmt(selected.createdAt) : ""}</p>
+          </div>
+          <button type="button" className="btn btn-outline btn-sm" onClick={close}>Close</button>
+        </div>
+        {editForm}
       </Modal>
     </>
   );
@@ -1493,18 +2209,22 @@ function VideoReleasesTab({
 
   return (
     <>
-      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 16 }}>
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Search releases..."
-          style={{ width: 320, maxWidth: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid var(--color-border)", background: "var(--color-surface)", color: "var(--color-text)", outline: "none" }}
-        />
-        <button className="btn btn-primary" onClick={() => setCreating((v) => !v)} style={{ padding: "10px 16px", fontSize: 14 }}>
+      <Toolbar loose>
+        <label className="toolbar-field">
+          <span className="text-muted" style={{ fontSize: 11 }}>Search</span>
+          <input
+            className="input input-search"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search releases..."
+          />
+        </label>
+        <button type="button" className="btn btn-primary" onClick={() => setCreating((v) => !v)}>
           {creating ? "Cancel" : "+ Send New Release"}
         </button>
-        <span style={{ opacity: 0.75, fontSize: 14 }}>{filtered.length} releases</span>
-      </div>
+        <span className="toolbar-spacer" />
+        <span className="meta">{filtered.length} releases</span>
+      </Toolbar>
 
       {creating && (
         <div className="card" style={{ display: "grid", gap: 12, marginBottom: 16 }}>
@@ -1529,7 +2249,7 @@ function VideoReleasesTab({
       )}
 
       {filtered.length === 0 ? (
-        <p style={{ opacity: 0.75 }}>No video releases found.</p>
+        <EmptyState title="No video releases" hint="Send a release form to collect electronic signatures." />
       ) : (
         <div className="admin-table-wrap">
           <table className="admin-table">
@@ -1545,25 +2265,31 @@ function VideoReleasesTab({
                   <tr key={r.id}>
                     <td style={{ whiteSpace: "nowrap" }}>{fmtDate(r.createdAt)}</td>
                     <td>{r.clientName}</td>
-                    <td><span style={{ color: "var(--color-secondary)" }}>{r.clientEmail}</span></td>
-                    <td>{r.propertyAddress || <span style={{ opacity: 0.5 }}>—</span>}</td>
+                    <td><span className="text-primary-accent">{r.clientEmail}</span></td>
+                    <td>{r.propertyAddress || <span className="text-subtle">—</span>}</td>
                     <td style={{ whiteSpace: "nowrap" }}>{fmt(r.tokenExpiresAt)}</td>
-                    <td><span style={pillStyle(state === "PENDING" ? "CONFIRMED" : state === "SIGNED" ? "completed" : "cancelled")}>{state}</span></td>
                     <td>
-                      <div style={{ display: "flex", gap: 8 }}>
-                        <button
-                          onClick={() => setSelectedId(r.id)}
-                          style={{ padding: "4px 10px", borderRadius: 8, border: "1px solid var(--color-border)", color: "var(--color-text)", background: "transparent", cursor: "pointer", fontSize: 13 }}
-                        >
-                          View
-                        </button>
-                        <button
+                      <StatusBadge
+                        status={
+                          state === "PENDING"
+                            ? "CONFIRMED"
+                            : state === "SIGNED"
+                              ? "completed"
+                              : "cancelled"
+                        }
+                        label={state}
+                      />
+                    </td>
+                    <td onClick={(e) => e.stopPropagation()}>
+                      <div className="row" style={{ gap: 8 }}>
+                        <RowAction onClick={() => setSelectedId(r.id)}>View</RowAction>
+                        <RowAction
+                          variant="primary"
                           disabled={sending || state === "SIGNED"}
                           onClick={() => resendRelease(r.id)}
-                          style={{ padding: "4px 10px", borderRadius: 8, border: "1px solid var(--color-border)", color: state === "SIGNED" ? "var(--color-muted)" : "var(--color-text)", background: "transparent", cursor: sending || state === "SIGNED" ? "not-allowed" : "pointer", fontSize: 13 }}
                         >
                           {sending ? "Sending..." : "Resend"}
-                        </button>
+                        </RowAction>
                       </div>
                     </td>
                   </tr>
@@ -1577,12 +2303,12 @@ function VideoReleasesTab({
       <Modal open={!!selected} onClose={() => setSelectedId(null)}>
         {selected && (
           <>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", gap: 16 }}>
+            <div className="modal-head">
               <div>
-                <h2 style={{ margin: 0, fontSize: 24 }}>Release Details</h2>
-                <p style={{ marginTop: 4, opacity: 0.75, fontSize: 14 }}>Created: {fmt(selected.createdAt)}</p>
+                <h2>Release Details</h2>
+                <p className="subtitle">Created: {fmt(selected.createdAt)}</p>
               </div>
-              <button className="btn btn-outline" onClick={() => setSelectedId(null)} style={{ padding: "6px 14px", fontSize: 13 }}>Close</button>
+              <button type="button" className="btn btn-outline btn-sm" onClick={() => setSelectedId(null)}>Close</button>
             </div>
             <div className="grid grid-2">
               <div><b>Client:</b> {selected.clientName}</div>
@@ -1606,11 +2332,20 @@ function VideoReleasesTab({
    DASHBOARD TAB
    ════════════════════════════════════════════════════════════════ */
 
-function DashboardTab({ bookings, clients, jobs, testimonials, setTab, jumpToBookingsFiltered, onOpenBooking }: {
+function DashboardTab({
+  bookings,
+  jobs,
+  testimonials,
+  videoReleases,
+  setTab,
+  jumpToBookingsFiltered,
+  onOpenBooking,
+}: {
   bookings: Booking[];
   clients: Client[];
   jobs: Job[];
   testimonials: Testimonial[];
+  videoReleases: VideoRelease[];
   setTab: (t: Tab) => void;
   jumpToBookingsFiltered: (filter: "ALL" | BookingStatus) => void;
   onOpenBooking: (id: string) => void;
@@ -1620,93 +2355,336 @@ function DashboardTab({ bookings, clients, jobs, testimonials, setTab, jumpToBoo
 
   const bookingsThisMonth = bookings.filter((b) => new Date(b.createdAt) >= monthStart).length;
   const newBookings = bookings.filter((b) => b.status === "NEW").length;
-  const activeJobs = jobs.filter((j) => j.status === "assigned" || j.status === "in_progress").length;
   const revenueThisMonth = jobs
     .filter((j) => j.status === "completed" && new Date(j.createdAt) >= monthStart)
     .reduce((sum, j) => sum + (j.totalPay ?? 0), 0);
-  const totalClients = clients.length;
-  const newClientsThisMonth = clients.filter((c) => new Date(c.createdAt) >= monthStart).length;
-  const visibleTestimonials = testimonials.filter((t) => t.visible).length;
 
-  // Recent activity — last 10 bookings
-  const recentBookings = [...bookings]
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .slice(0, 8);
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const todayEnd = new Date(todayStart);
+  todayEnd.setDate(todayEnd.getDate() + 1);
 
-  const clickableTileStyle: CSSProperties = {
-    cursor: "pointer",
-    border: "1px solid transparent",
-    transition: "border-color 0.15s",
-  };
+  const todayAppointments = useMemo(() => {
+    return bookings
+      .filter((b) => {
+        if (!b.scheduledDate || b.status === "CANCELED") return false;
+        const d = new Date(b.scheduledDate);
+        return d >= todayStart && d < todayEnd;
+      })
+      .sort(
+        (a, b) =>
+          new Date(a.scheduledDate!).getTime() - new Date(b.scheduledDate!).getTime(),
+      );
+  }, [bookings, todayStart, todayEnd]);
+
+  const nextSevenDays = useMemo(() => {
+    const out: { date: Date; items: Booking[] }[] = [];
+    for (let i = 1; i <= 7; i++) {
+      const dayStart = addDays(todayStart, i);
+      const dayEnd = addDays(todayStart, i + 1);
+      const items = bookings
+        .filter((b) => {
+          if (!b.scheduledDate || b.status === "CANCELED") return false;
+          const d = new Date(b.scheduledDate);
+          return d >= dayStart && d < dayEnd;
+        })
+        .sort(
+          (a, b) =>
+            new Date(a.scheduledDate!).getTime() - new Date(b.scheduledDate!).getTime(),
+        );
+      out.push({ date: dayStart, items });
+    }
+    return out;
+  }, [bookings, todayStart]);
+
+  const needsAttention = useMemo(() => {
+    const noDateNew = bookings.filter((b) => b.status === "NEW" && !b.scheduledDate);
+    const msDay = 24 * 60 * 60 * 1000;
+    const soon = bookings.filter((b) => {
+      if (b.status !== "CONFIRMED" || !b.scheduledDate) return false;
+      const t = new Date(b.scheduledDate).getTime();
+      return t > now.getTime() && t <= now.getTime() + msDay;
+    });
+    return { noDateNew, soon };
+  }, [bookings, now]);
+
+  type ActivityRow =
+    | { kind: "booking"; at: string; booking: Booking }
+    | { kind: "testimonial"; at: string; t: Testimonial }
+    | { kind: "release"; at: string; r: VideoRelease };
+
+  const activityFeed = useMemo(() => {
+    const rows: ActivityRow[] = [];
+    for (const b of bookings) rows.push({ kind: "booking", at: b.createdAt, booking: b });
+    for (const t of testimonials) rows.push({ kind: "testimonial", at: t.createdAt, t });
+    for (const r of videoReleases) rows.push({ kind: "release", at: r.createdAt, r });
+    rows.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+    return rows.slice(0, 12);
+  }, [bookings, testimonials, videoReleases]);
+
+  function releaseDisplayStatus(r: VideoRelease) {
+    if (r.status === "SIGNED") return "SIGNED";
+    return new Date(r.tokenExpiresAt).getTime() < Date.now() ? "EXPIRED" : "PENDING";
+  }
 
   return (
     <>
-      {/* Quick Actions */}
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20 }}>
-        <button className="btn btn-primary" onClick={() => setTab("bookings")} style={{ padding: "10px 18px", fontSize: 14 }}>View Bookings</button>
-        <button className="btn btn-outline" onClick={() => setTab("schedule")} style={{ padding: "10px 18px", fontSize: 14 }}>Schedule</button>
-        <button className="btn btn-outline" onClick={() => setTab("clients")} style={{ padding: "10px 18px", fontSize: 14 }}>Manage Clients</button>
-        <button className="btn btn-outline" onClick={() => setTab("testimonials")} style={{ padding: "10px 18px", fontSize: 14 }}>Manage Testimonials</button>
-      </div>
-
-      {/* Stats Grid */}
-      <div className="stat-row" style={{ marginBottom: 24 }}>
-        <div className="stat-card"><strong>{bookingsThisMonth}</strong><small>Bookings This Month</small></div>
-        <button
-          type="button"
-          className="stat-card"
-          onClick={() => jumpToBookingsFiltered("NEW")}
-          style={clickableTileStyle}
-          title="Open Bookings filtered to NEW"
-        >
-          <strong>{newBookings}</strong><small>New / Pending</small>
+      <div className="toolbar" style={{ marginBottom: 8 }}>
+        <button type="button" className="btn btn-primary btn-sm" onClick={() => setTab("bookings")}>
+          View Bookings
         </button>
-        <div className="stat-card"><strong>{activeJobs}</strong><small>Active Jobs</small></div>
-        <div className="stat-card"><strong>${revenueThisMonth.toFixed(2)}</strong><small>Revenue This Month</small></div>
-        <div className="stat-card"><strong>{totalClients}</strong><small>Total Clients</small></div>
-        <div className="stat-card"><strong>{newClientsThisMonth}</strong><small>New Clients This Month</small></div>
-        <div className="stat-card"><strong>{visibleTestimonials}/{testimonials.length}</strong><small>Testimonials Visible</small></div>
+        <button type="button" className="btn btn-outline btn-sm" onClick={() => setTab("schedule")}>
+          Schedule
+        </button>
+        <button type="button" className="btn btn-outline btn-sm" onClick={() => setTab("clients")}>
+          Clients
+        </button>
+        <button type="button" className="btn btn-outline btn-sm" onClick={() => setTab("jobs")}>
+          Jobs
+        </button>
       </div>
 
-      {/* Recent Activity */}
-      <h3 style={{ fontSize: 18, marginBottom: 12 }}>Recent Bookings</h3>
-      {recentBookings.length === 0 ? (
-        <p style={{ opacity: 0.75 }}>No recent bookings.</p>
-      ) : (
-        <div style={{ display: "grid", gap: 8 }}>
-          {recentBookings.map((b) => (
-            <button
-              key={b.id}
-              type="button"
-              onClick={() => onOpenBooking(b.id)}
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                padding: "12px 16px",
-                background: "var(--color-surface)",
-                border: "1px solid var(--color-border)",
-                borderRadius: 12,
-                fontSize: 14,
-                width: "100%",
-                textAlign: "left",
-                color: "inherit",
-                font: "inherit",
-                cursor: "pointer",
-              }}
-            >
-              <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
-                <span style={{ fontWeight: 600 }}>{b.name}</span>
-                <span style={{ color: "var(--color-muted)" }}>{b.address}</span>
+      <div className="kpi-grid" style={{ marginBottom: 20 }}>
+        <KpiCard
+          label="Today"
+          value={todayAppointments.length}
+          foot="Appointments scheduled today"
+          tone="primary"
+          onClick={() => setTab("schedule")}
+        />
+        <KpiCard
+          label="Pending requests"
+          value={newBookings}
+          foot="New bookings to review"
+          tone="warning"
+          onClick={() => jumpToBookingsFiltered("NEW")}
+        />
+        <KpiCard
+          label="This month"
+          value={bookingsThisMonth}
+          foot="Bookings submitted"
+          tone="info"
+          onClick={() => setTab("bookings")}
+        />
+        <KpiCard
+          label="Revenue (month)"
+          value={`$${revenueThisMonth.toFixed(2)}`}
+          foot="From completed jobs"
+          tone="success"
+          onClick={() => setTab("jobs")}
+        />
+      </div>
+
+      <div className="dashboard-grid">
+        <div className="stack">
+          <div className="card card-flush">
+            <div className="card-row">
+              <h3 style={{ margin: 0 }}>Today</h3>
+            </div>
+            {todayAppointments.length === 0 ? (
+              <div className="card-row">
+                <p className="text-muted" style={{ margin: 0 }}>
+                  Nothing on the calendar today.
+                </p>
               </div>
-              <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                <span style={{ color: "var(--color-muted)", fontSize: 13 }}>{fmtDate(b.createdAt)}</span>
-                <span style={pillStyle(b.status)}>{b.status}</span>
+            ) : (
+              todayAppointments.map((b) => (
+                <button
+                  key={b.id}
+                  type="button"
+                  className={`agenda-row${b.status === "CANCELED" ? " canceled" : ""}`}
+                  onClick={() => onOpenBooking(b.id)}
+                >
+                  <span className="agenda-time">
+                    {new Date(b.scheduledDate!).toLocaleTimeString([], {
+                      hour: "numeric",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                  <div className="agenda-row-body">
+                    <span className="agenda-row-name">{b.name}</span>
+                    <span className="agenda-row-sub">{b.address}</span>
+                  </div>
+                  <StatusBadge status={b.status} />
+                </button>
+              ))
+            )}
+          </div>
+
+          <div className="card card-flush">
+            <div className="card-row">
+              <h3 style={{ margin: 0 }}>Next 7 days</h3>
+            </div>
+            {nextSevenDays.every((d) => d.items.length === 0) ? (
+              <div className="card-row">
+                <p className="text-muted" style={{ margin: 0 }}>
+                  No upcoming appointments in the next week.
+                </p>
               </div>
-            </button>
-          ))}
+            ) : (
+              nextSevenDays.flatMap((day) =>
+                day.items.length === 0
+                  ? []
+                  : [
+                      <div key={day.date.toISOString()} className="agenda-day">
+                        <div>
+                          <div className="agenda-day-label">
+                            {day.date.toLocaleDateString([], { weekday: "short" })}
+                          </div>
+                          <div className="agenda-day-date">{day.date.getDate()}</div>
+                        </div>
+                        <div className="agenda-day-list">
+                          {day.items.map((b) => (
+                            <button
+                              key={b.id}
+                              type="button"
+                              className={`agenda-row${b.status === "CANCELED" ? " canceled" : ""}`}
+                              onClick={() => onOpenBooking(b.id)}
+                            >
+                              <span className="agenda-time">
+                                {new Date(b.scheduledDate!).toLocaleTimeString([], {
+                                  hour: "numeric",
+                                  minute: "2-digit",
+                                })}
+                              </span>
+                              <div className="agenda-row-body">
+                                <span className="agenda-row-name">{b.name}</span>
+                                <span className="agenda-row-sub">{b.serviceType || b.address}</span>
+                              </div>
+                              <StatusBadge status={b.status} />
+                            </button>
+                          ))}
+                        </div>
+                      </div>,
+                    ],
+              )
+            )}
+          </div>
         </div>
-      )}
+
+        <div className="card">
+          <h3>Needs attention</h3>
+          {needsAttention.noDateNew.length === 0 && needsAttention.soon.length === 0 ? (
+            <p className="text-muted" style={{ margin: 0 }}>
+              You&apos;re all caught up.
+            </p>
+          ) : (
+            <div className="stack">
+              {needsAttention.noDateNew.length > 0 && (
+                <div className="alert alert-warning">
+                  <span>
+                    <strong>{needsAttention.noDateNew.length}</strong> new request
+                    {needsAttention.noDateNew.length === 1 ? "" : "s"} need a scheduled date.
+                  </span>
+                  <button type="button" className="btn btn-outline btn-sm" onClick={() => setTab("bookings")}>
+                    Review
+                  </button>
+                </div>
+              )}
+              {needsAttention.soon.length > 0 && (
+                <div className="stack">
+                  <small className="text-muted">Starting within 24 hours</small>
+                  {needsAttention.soon.map((b) => (
+                    <button
+                      key={b.id}
+                      type="button"
+                      className="agenda-row"
+                      onClick={() => onOpenBooking(b.id)}
+                    >
+                      <span className="agenda-time">
+                        {new Date(b.scheduledDate!).toLocaleTimeString([], {
+                          hour: "numeric",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                      <div className="agenda-row-body">
+                        <span className="agenda-row-name">{b.name}</span>
+                        <span className="agenda-row-sub">{b.address}</span>
+                      </div>
+                      <StatusBadge status={b.status} />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="card">
+        <h3>Recent activity</h3>
+        {activityFeed.length === 0 ? (
+          <p className="text-muted" style={{ margin: 0 }}>
+            No activity yet.
+          </p>
+        ) : (
+          <div className="stack">
+            {activityFeed.map((row) => {
+              if (row.kind === "booking") {
+                const b = row.booking;
+                return (
+                  <button
+                    key={row.kind + b.id}
+                    type="button"
+                    className="agenda-row"
+                    onClick={() => onOpenBooking(b.id)}
+                  >
+                    <span className="agenda-time text-muted" style={{ fontWeight: 500 }}>
+                      Booking
+                    </span>
+                    <div className="agenda-row-body">
+                      <span className="agenda-row-name">{b.name}</span>
+                      <span className="agenda-row-sub">{fmtDate(b.createdAt)} · {b.address}</span>
+                    </div>
+                    <StatusBadge status={b.status} />
+                  </button>
+                );
+              }
+              if (row.kind === "testimonial") {
+                const t = row.t;
+                return (
+                  <button
+                    key={row.kind + t.id}
+                    type="button"
+                    className="agenda-row"
+                    onClick={() => setTab("testimonials")}
+                  >
+                    <span className="agenda-time text-muted" style={{ fontWeight: 500 }}>
+                      Review
+                    </span>
+                    <div className="agenda-row-body">
+                      <span className="agenda-row-name">{t.name}</span>
+                      <span className="agenda-row-sub">{fmtDate(t.createdAt)}</span>
+                    </div>
+                    <StatusBadge
+                      status={t.visible ? "CONFIRMED" : "NEW"}
+                      label={t.visible ? "Visible" : "Hidden"}
+                    />
+                  </button>
+                );
+              }
+              const r = row.r;
+              const st = releaseDisplayStatus(r);
+              return (
+                <button
+                  key={row.kind + r.id}
+                  type="button"
+                  className="agenda-row"
+                  onClick={() => setTab("videoReleases")}
+                >
+                  <span className="agenda-time text-muted" style={{ fontWeight: 500 }}>
+                    Release
+                  </span>
+                  <div className="agenda-row-body">
+                    <span className="agenda-row-name">{r.clientName}</span>
+                    <span className="agenda-row-sub">{fmtDate(r.createdAt)}</span>
+                  </div>
+                  <StatusBadge status={st} />
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </>
   );
 }
@@ -1841,17 +2819,22 @@ function TestimonialsTab({ testimonials, setTestimonials, reload }: {
 
   return (
     <>
-      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 16 }}>
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search testimonials…"
-          style={{ width: 300, maxWidth: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid var(--color-border)", background: "var(--color-surface)", color: "var(--color-text)", outline: "none" }} />
-        <button className="btn btn-primary" onClick={startCreate} style={{ padding: "10px 16px", fontSize: 14 }}>+ Add Testimonial</button>
+      <Toolbar loose>
+        <label className="toolbar-field">
+          <span className="text-muted" style={{ fontSize: 11 }}>Search</span>
+          <input className="input input-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search testimonials…" />
+        </label>
+        <button type="button" className="btn btn-primary" onClick={startCreate}>+ Add Testimonial</button>
         {testimonials.length === 0 && (
-          <button className="btn btn-outline" onClick={seedTestimonials} style={{ padding: "10px 16px", fontSize: 14, borderColor: "rgba(88,166,255,0.5)", color: "var(--color-secondary)" }}>Seed Default Testimonials</button>
+          <button type="button" className="btn btn-secondary" onClick={seedTestimonials}>Seed Default Testimonials</button>
         )}
-        <span style={{ opacity: 0.75, fontSize: 14 }}>{visibleCount} visible / {testimonials.length} total</span>
-      </div>
+        <span className="toolbar-spacer" />
+        <span className="meta">{visibleCount} visible / {testimonials.length} total</span>
+      </Toolbar>
 
-      {filtered.length === 0 ? <p style={{ opacity: 0.75 }}>No testimonials found.</p> : (
+      {filtered.length === 0 ? (
+        <EmptyState title="No testimonials" hint="Add reviews or seed defaults for the website." />
+      ) : (
         <div className="admin-table-wrap">
           <table className="admin-table">
             <thead>
@@ -1862,30 +2845,21 @@ function TestimonialsTab({ testimonials, setTestimonials, reload }: {
                 <tr key={t.id} style={{ cursor: "pointer" }} onClick={() => openTestimonial(t)}>
                   <td>{t.sortOrder}</td>
                   <td style={{ fontWeight: 600 }}>{t.name}</td>
-                  <td style={{ color: "var(--color-muted)", maxWidth: 400 }}>
+                  <td className="text-muted" style={{ maxWidth: 400 }}>
                     {t.quote.length > 80 ? t.quote.slice(0, 80) + "…" : t.quote}
                   </td>
-                  <td>{t.rating ? "★".repeat(t.rating) + "☆".repeat(5 - t.rating) : <span style={{ opacity: 0.5 }}>—</span>}</td>
-                  <td>
+                  <td>{t.rating ? "★".repeat(t.rating) + "☆".repeat(5 - t.rating) : <span className="text-subtle">—</span>}</td>
+                  <td onClick={(e) => e.stopPropagation()}>
                     <button
-                      onClick={(e) => { e.stopPropagation(); toggleVisibility(t); }}
-                      style={{
-                        padding: "4px 10px", borderRadius: 999, fontSize: 12, fontWeight: 600, cursor: "pointer", border: "1px solid",
-                        ...(t.visible
-                          ? { borderColor: "rgba(34,197,94,0.4)", color: "#86efac", background: "rgba(34,197,94,0.12)" }
-                          : { borderColor: "var(--color-border)", color: "var(--color-muted)", background: "rgba(255,255,255,0.06)" }),
-                      }}
+                      type="button"
+                      className={`toggle-pill${t.visible ? " on" : " off"}`}
+                      onClick={() => toggleVisibility(t)}
                     >
                       {t.visible ? "Visible" : "Hidden"}
                     </button>
                   </td>
-                  <td>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); openTestimonial(t); }}
-                      style={{ padding: "4px 10px", borderRadius: 8, border: "1px solid var(--color-border)", color: "var(--color-text)", background: "transparent", cursor: "pointer", fontSize: 13 }}
-                    >
-                      Edit
-                    </button>
+                  <td onClick={(e) => e.stopPropagation()}>
+                    <RowAction onClick={() => openTestimonial(t)}>Edit</RowAction>
                   </td>
                 </tr>
               ))}
@@ -1895,9 +2869,9 @@ function TestimonialsTab({ testimonials, setTestimonials, reload }: {
       )}
 
       <Modal open={!!selected || creating} onClose={close}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", gap: 16 }}>
-          <h2 style={{ margin: 0, fontSize: 24 }}>{creating ? "New Testimonial" : "Edit Testimonial"}</h2>
-          <button className="btn btn-outline" onClick={close} style={{ padding: "6px 14px", fontSize: 13 }}>Close</button>
+        <div className="modal-head">
+          <h2>{creating ? "New Testimonial" : "Edit Testimonial"}</h2>
+          <button type="button" className="btn btn-outline btn-sm" onClick={close}>Close</button>
         </div>
 
         <div className="grid grid-2">
@@ -1920,16 +2894,18 @@ function TestimonialsTab({ testimonials, setTestimonials, reload }: {
           <label>Sort Order
             <input className="input" type="number" min="0" value={(draft.sortOrder as string) ?? "0"} onChange={(e) => setDraft({ ...draft, sortOrder: e.target.value })} />
           </label>
-          <label style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 12, cursor: "pointer" }}>
+          <label className="inline">
             <input type="checkbox" checked={draft.visible as boolean} onChange={(e) => setDraft({ ...draft, visible: e.target.checked })}
-              style={{ width: 20, height: 20, accentColor: "var(--color-primary)" }} />
+              style={{ width: 20, height: 20, accentColor: "var(--admin-primary)" }} />
             <span>Visible on website</span>
           </label>
         </div>
 
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-          {!creating && <button className="btn btn-outline" onClick={deleteTestimonial} disabled={saving} style={{ borderColor: "rgba(239,68,68,0.5)", color: "#fca5a5" }}>Delete Testimonial</button>}
-          <button className="btn btn-primary" onClick={save} disabled={saving} style={{ marginLeft: "auto" }}>{saving ? "Saving…" : creating ? "Add Testimonial" : "Save Changes"}</button>
+        <div className="modal-foot">
+          {!creating && <button type="button" className="btn btn-danger-outline" onClick={deleteTestimonial} disabled={saving}>Delete Testimonial</button>}
+          <div className="modal-foot-actions">
+            <button type="button" className="btn btn-primary" onClick={save} disabled={saving}>{saving ? "Saving…" : creating ? "Add Testimonial" : "Save Changes"}</button>
+          </div>
         </div>
       </Modal>
     </>
@@ -2025,38 +3001,59 @@ function GalleryTab({ gallery, setGallery, reload }: {
 
   return (
     <>
-      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 16 }}>
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search gallery..."
-          style={{ width: 300, maxWidth: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid var(--color-border)", background: "var(--color-surface)", color: "var(--color-text)", outline: "none" }} />
-        <button className="btn btn-primary" onClick={startCreate} style={{ padding: "10px 16px", fontSize: 14 }}>+ Add Before/After</button>
-        <span style={{ opacity: 0.75, fontSize: 14 }}>{visibleCount} visible / {gallery.length} total</span>
-      </div>
+      <Toolbar loose>
+        <label className="toolbar-field">
+          <span className="text-muted" style={{ fontSize: 11 }}>Search</span>
+          <input className="input input-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search gallery…" />
+        </label>
+        <button type="button" className="btn btn-primary" onClick={startCreate}>+ Add Before/After</button>
+        <span className="toolbar-spacer" />
+        <span className="meta">{visibleCount} visible / {gallery.length} total</span>
+      </Toolbar>
 
-      {filtered.length === 0 ? <p style={{ opacity: 0.75 }}>No gallery items found. Add your first before/after photo pair above.</p> : (
-        <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))" }}>
+      {filtered.length === 0 ? (
+        <EmptyState title="No gallery items" hint="Add before and after photo pairs for the website." />
+      ) : (
+        <div className="gallery-grid">
           {filtered.map((g) => (
-            <div key={g.id} className="card" style={{ cursor: "pointer", opacity: g.visible ? 1 : 0.5 }} onClick={() => openItem(g)}>
-              <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-                <div style={{ flex: 1, borderRadius: 8, overflow: "hidden", height: 120, background: "var(--color-surface-2)", position: "relative" }}>
-                  <span style={{ position: "absolute", top: 4, left: 4, background: "rgba(0,0,0,0.6)", color: "#fff", fontSize: 10, padding: "2px 6px", borderRadius: 4, zIndex: 1 }}>BEFORE</span>
+            <div
+              key={g.id}
+              role="button"
+              tabIndex={0}
+              className={`gallery-card${g.visible ? "" : " hidden-item"}`}
+              onClick={() => openItem(g)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  openItem(g);
+                }
+              }}
+            >
+              <div className="img-pair">
+                <div>
+                  <span className="img-tag">Before</span>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={g.beforeImageUrl} alt="Before" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  <img src={g.beforeImageUrl} alt="Before" />
                 </div>
-                <div style={{ flex: 1, borderRadius: 8, overflow: "hidden", height: 120, background: "var(--color-surface-2)", position: "relative" }}>
-                  <span style={{ position: "absolute", top: 4, left: 4, background: "rgba(34,197,94,0.7)", color: "#fff", fontSize: 10, padding: "2px 6px", borderRadius: 4, zIndex: 1 }}>AFTER</span>
+                <div>
+                  <span className="img-tag img-tag-after">After</span>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={g.afterImageUrl} alt="After" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  <img src={g.afterImageUrl} alt="After" />
                 </div>
               </div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div className="gallery-body">
                 <div>
-                  <strong>{g.title}</strong>
-                  {g.description && <p style={{ fontSize: 13, color: "var(--color-muted)", marginTop: 4 }}>{g.description}</p>}
+                  <div className="gallery-title">{g.title}</div>
+                  {g.description ? <p className="gallery-desc">{g.description}</p> : null}
                 </div>
-                <button onClick={(e) => { e.stopPropagation(); toggleVisibility(g); }}
-                  style={{ padding: "4px 10px", borderRadius: 999, fontSize: 12, fontWeight: 600, cursor: "pointer", border: "1px solid",
-                    ...(g.visible ? { borderColor: "rgba(34,197,94,0.4)", color: "#86efac", background: "rgba(34,197,94,0.12)" }
-                      : { borderColor: "var(--color-border)", color: "var(--color-muted)", background: "rgba(255,255,255,0.06)" }) }}>
+                <button
+                  type="button"
+                  className={`toggle-pill${g.visible ? " on" : " off"}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleVisibility(g);
+                  }}
+                >
                   {g.visible ? "Visible" : "Hidden"}
                 </button>
               </div>
@@ -2066,9 +3063,9 @@ function GalleryTab({ gallery, setGallery, reload }: {
       )}
 
       <Modal open={!!selected || creating} onClose={close}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", gap: 16 }}>
-          <h2 style={{ margin: 0, fontSize: 24 }}>{creating ? "New Gallery Item" : "Edit Gallery Item"}</h2>
-          <button className="btn btn-outline" onClick={close} style={{ padding: "6px 14px", fontSize: 13 }}>Close</button>
+        <div className="modal-head">
+          <h2>{creating ? "New Gallery Item" : "Edit Gallery Item"}</h2>
+          <button type="button" className="btn btn-outline btn-sm" onClick={close}>Close</button>
         </div>
 
         <label>Title *<input className="input" value={(draft.title as string) ?? ""} onChange={(e) => setDraft({ ...draft, title: e.target.value })} placeholder="e.g. Living Room Reset" /></label>
@@ -2080,17 +3077,19 @@ function GalleryTab({ gallery, setGallery, reload }: {
         </div>
 
         {((draft.beforeImageUrl as string) || (draft.afterImageUrl as string)) && (
-          <div style={{ display: "flex", gap: 8 }}>
+          <div className="img-pair" style={{ borderRadius: "var(--admin-radius)" }}>
             {(draft.beforeImageUrl as string) && (
-              <div style={{ flex: 1, borderRadius: 8, overflow: "hidden", height: 140, background: "var(--color-surface-2)" }}>
+              <div>
+                <span className="img-tag">Before</span>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={draft.beforeImageUrl as string} alt="Before preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                <img src={draft.beforeImageUrl as string} alt="Before preview" />
               </div>
             )}
             {(draft.afterImageUrl as string) && (
-              <div style={{ flex: 1, borderRadius: 8, overflow: "hidden", height: 140, background: "var(--color-surface-2)" }}>
+              <div>
+                <span className="img-tag img-tag-after">After</span>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={draft.afterImageUrl as string} alt="After preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                <img src={draft.afterImageUrl as string} alt="After preview" />
               </div>
             )}
           </div>
@@ -2098,15 +3097,17 @@ function GalleryTab({ gallery, setGallery, reload }: {
 
         <div className="grid grid-2">
           <label>Sort Order<input className="input" type="number" min="0" value={(draft.sortOrder as string) ?? "0"} onChange={(e) => setDraft({ ...draft, sortOrder: e.target.value })} /></label>
-          <label style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 12, cursor: "pointer" }}>
-            <input type="checkbox" checked={draft.visible as boolean} onChange={(e) => setDraft({ ...draft, visible: e.target.checked })} style={{ width: 20, height: 20, accentColor: "var(--color-primary)" }} />
+          <label className="inline">
+            <input type="checkbox" checked={draft.visible as boolean} onChange={(e) => setDraft({ ...draft, visible: e.target.checked })} style={{ width: 20, height: 20, accentColor: "var(--admin-primary)" }} />
             <span>Visible on website</span>
           </label>
         </div>
 
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-          {!creating && <button className="btn btn-outline" onClick={deleteItem} disabled={saving} style={{ borderColor: "rgba(239,68,68,0.5)", color: "#fca5a5" }}>Delete Item</button>}
-          <button className="btn btn-primary" onClick={save} disabled={saving} style={{ marginLeft: "auto" }}>{saving ? "Saving..." : creating ? "Add Item" : "Save Changes"}</button>
+        <div className="modal-foot">
+          {!creating && <button type="button" className="btn btn-danger-outline" onClick={deleteItem} disabled={saving}>Delete Item</button>}
+          <div className="modal-foot-actions">
+            <button type="button" className="btn btn-primary" onClick={save} disabled={saving}>{saving ? "Saving..." : creating ? "Add Item" : "Save Changes"}</button>
+          </div>
         </div>
       </Modal>
     </>
@@ -2127,12 +3128,14 @@ function ScheduleTab({ bookings, cleaners, reload, setTab, onOpenBooking }: {
   setTab: (t: Tab) => void;
   onOpenBooking: (id: string) => void;
 }) {
-  const [view, setView] = useState<"calendar" | "list" | "availability" | "blocked">("calendar");
+  const [view, setView] = useState<"calendar" | "week" | "list" | "availability" | "blocked">("calendar");
   const [openDayKey, setOpenDayKey] = useState<string | null>(null);
   const [monthCursor, setMonthCursor] = useState<Date>(() => {
     const d = new Date();
     return new Date(d.getFullYear(), d.getMonth(), 1);
   });
+  const [weekStart, setWeekStart] = useState<Date>(() => startOfWeekMonday(new Date()));
+  const [slotPreviewDate, setSlotPreviewDate] = useState("");
   const [config, setConfig] = useState<AvailabilityRule[]>([]);
   const [blocked, setBlocked] = useState<BlockedSlot[]>([]);
   const [loadingCfg, setLoadingCfg] = useState(false);
@@ -2233,8 +3236,34 @@ function ScheduleTab({ bookings, cleaners, reload, setTab, onOpenBooking }: {
       .sort((a, b) => new Date(a.scheduledDate!).getTime() - new Date(b.scheduledDate!).getTime());
   }, [bookings]);
 
+  const weekDays = useMemo(
+    () => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)),
+    [weekStart],
+  );
+
+  const previewSlots = useMemo(() => {
+    if (!slotPreviewDate.trim()) return [];
+    const d = new Date(`${slotPreviewDate}T12:00:00`);
+    if (Number.isNaN(d.getTime())) return [];
+    const dow = d.getDay();
+    const rule =
+      config.find((r) => r.dayOfWeek === dow) ??
+      DEFAULT_AVAILABILITY.find((r) => r.dayOfWeek === dow) ?? {
+        dayOfWeek: dow,
+        startTime: "09:00",
+        endTime: "17:00",
+        slotMinutes: 60,
+        enabled: false,
+      };
+    return generateSlotsForDate(d, rule).map((s) => formatSlotLabel(s));
+  }, [slotPreviewDate, config]);
+
   function shiftMonth(delta: number) {
     setMonthCursor(new Date(monthStart.getFullYear(), monthStart.getMonth() + delta, 1));
+  }
+
+  function shiftWeek(delta: number) {
+    setWeekStart((ws) => addDays(ws, delta * 7));
   }
 
   async function setStatus(bookingId: string, status: string) {
@@ -2327,43 +3356,33 @@ function ScheduleTab({ bookings, cleaners, reload, setTab, onOpenBooking }: {
   return (
     <>
       {pendingNoDate > 0 && (
-        <div
-          style={{
-            display: "flex",
-            gap: 12,
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "10px 14px",
-            marginBottom: 12,
-            borderRadius: 8,
-            background: "rgba(245, 158, 11, 0.10)",
-            border: "1px solid rgba(245, 158, 11, 0.35)",
-            fontSize: 13,
-          }}
-        >
+        <div className="alert alert-warning" style={{ marginBottom: 12 }}>
           <span>
             <strong>{pendingNoDate}</strong> pending request{pendingNoDate === 1 ? "" : "s"} need{pendingNoDate === 1 ? "s" : ""} a date — these don&apos;t appear on the calendar yet.
           </span>
-          <button
-            type="button"
-            onClick={() => setTab("bookings")}
-            className="btn btn-outline"
-            style={{ padding: "4px 12px", fontSize: 13 }}
-          >
+          <button type="button" onClick={() => setTab("bookings")} className="btn btn-outline btn-sm">
             Open Bookings
           </button>
         </div>
       )}
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
-        {(["calendar", "list", "availability", "blocked"] as const).map((v) => (
+      <div className="segmented" style={{ marginBottom: 16 }}>
+        {(["calendar", "week", "list", "availability", "blocked"] as const).map((v) => (
           <button
             key={v}
+            type="button"
+            className={view === v ? "active" : ""}
             onClick={() => setView(v)}
-            className={`tab-btn${view === v ? " active" : ""}`}
-            style={{ padding: "8px 14px" }}
           >
-            {v === "calendar" ? "Calendar" : v === "list" ? "List" : v === "availability" ? "Availability" : "Blocked Times"}
+            {v === "calendar"
+              ? "Calendar"
+              : v === "week"
+                ? "Week"
+                : v === "list"
+                  ? "List"
+                  : v === "availability"
+                    ? "Availability"
+                    : "Blocked"}
           </button>
         ))}
       </div>
@@ -2379,9 +3398,9 @@ function ScheduleTab({ bookings, cleaners, reload, setTab, onOpenBooking }: {
             <button className="btn btn-outline" onClick={() => setMonthCursor(new Date(new Date().getFullYear(), new Date().getMonth(), 1))} style={{ padding: "6px 12px" }}>Today</button>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, fontSize: 13 }}>
+          <div className="cal-grid">
             {DAY_LABELS.map((d) => (
-              <div key={d} style={{ textAlign: "center", padding: 6, fontWeight: 600, color: "var(--color-muted)" }}>{d}</div>
+              <div key={d} className="cal-head">{d}</div>
             ))}
             {calendarCells.map((cell, idx) => {
               const key = `${cell.date.getFullYear()}-${cell.date.getMonth()}-${cell.date.getDate()}`;
@@ -2392,89 +3411,51 @@ function ScheduleTab({ bookings, cleaners, reload, setTab, onOpenBooking }: {
               const dowClosed = cell.inMonth && rule !== undefined && rule.enabled === false;
               const dayBlocks = blocksByDayKey.get(key) ?? [];
               const hasBlock = dayBlocks.length > 0;
-              const cellStyle: CSSProperties = {
-                minHeight: 100,
-                border: `1px solid ${isToday ? "var(--color-primary)" : "var(--color-border)"}`,
-                borderLeft: hasBlock
-                  ? "3px solid rgba(245, 158, 11, 0.7)"
-                  : `1px solid ${isToday ? "var(--color-primary)" : "var(--color-border)"}`,
-                borderRadius: 8,
-                padding: 6,
-                background: dowClosed
-                  ? "repeating-linear-gradient(45deg, rgba(255,255,255,0.02) 0 6px, rgba(255,255,255,0.05) 6px 12px)"
-                  : cell.inMonth
-                    ? "var(--color-surface)"
-                    : "rgba(255,255,255,0.02)",
-                opacity: cell.inMonth ? 1 : 0.5,
-                textAlign: "left",
-                font: "inherit",
-                color: "inherit",
-                cursor: clickable ? "pointer" : "default",
-                transition: "background 0.15s",
-                width: "100%",
-              };
+              const cellClass = [
+                "cal-cell",
+                clickable ? "clickable" : "",
+                !cell.inMonth ? "out-of-month" : "",
+                isToday ? "today" : "",
+                dowClosed ? "closed" : "",
+                hasBlock ? "has-block" : "",
+              ]
+                .filter(Boolean)
+                .join(" ");
               const blockTooltip = hasBlock
-                ? dayBlocks
-                    .map((b) => `Blocked: ${b.reason || "(no reason given)"}`)
-                    .join("\n")
+                ? dayBlocks.map((blk) => `Blocked: ${blk.reason || "(no reason given)"}`).join("\n")
                 : undefined;
               const cellChildren = (
                 <>
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      gap: 4,
-                      marginBottom: 4,
-                    }}
-                  >
+                  <div className="cal-cell-head">
                     <span style={{ fontSize: 12, fontWeight: 600 }}>{cell.date.getDate()}</span>
-                    {dowClosed && (
-                      <span
-                        style={{
-                          fontSize: 9,
-                          textTransform: "uppercase",
-                          letterSpacing: 0.5,
-                          color: "var(--color-muted)",
-                        }}
-                      >
-                        Closed
-                      </span>
-                    )}
+                    {dowClosed ? <span className="cal-cell-tag">Closed</span> : null}
                   </div>
                   <div style={{ display: "grid", gap: 3 }}>
                     {dayBookings.slice(0, 3).map((b) => {
                       const isCanceled = b.status === "CANCELED";
+                      const t = new Date(b.scheduledDate!).toLocaleTimeString([], {
+                        hour: "numeric",
+                        minute: "2-digit",
+                      });
                       return (
-                        <div
+                        <span
                           key={b.id}
                           title={`${b.name} - ${b.address}${isCanceled ? " (canceled)" : ""}`}
-                          style={{
-                            fontSize: 11,
-                            padding: "2px 6px",
-                            borderRadius: 4,
-                            ...statusBadge(b.status),
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                            opacity: isCanceled ? 0.45 : 1,
-                            textDecoration: isCanceled ? "line-through" : undefined,
-                          }}
+                          className={`cal-chip pill ${pillClassForStatus(b.status)}${isCanceled ? " canceled" : ""}`}
                         >
-                          {new Date(b.scheduledDate!).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} {b.name}
-                        </div>
+                          {t} {b.name}
+                        </span>
                       );
                     })}
                     {dayBookings.length > 3 && (
-                      <div style={{ fontSize: 10, color: "var(--color-muted)" }}>+{dayBookings.length - 3} more</div>
+                      <div className="cal-more">+{dayBookings.length - 3} more</div>
                     )}
                   </div>
                 </>
               );
               if (!clickable) {
                 return (
-                  <div key={idx} style={cellStyle} title={blockTooltip}>
+                  <div key={idx} className={cellClass} title={blockTooltip}>
                     {cellChildren}
                   </div>
                 );
@@ -2484,8 +3465,7 @@ function ScheduleTab({ bookings, cleaners, reload, setTab, onOpenBooking }: {
                   key={idx}
                   type="button"
                   onClick={() => setOpenDayKey(key)}
-                  className="schedule-day-cell"
-                  style={cellStyle}
+                  className={`${cellClass} schedule-day-cell`}
                   title={blockTooltip}
                   aria-label={`Open ${cell.date.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric", year: "numeric" })} (${dayBookings.length} booking${dayBookings.length === 1 ? "" : "s"})`}
                 >
@@ -2495,49 +3475,108 @@ function ScheduleTab({ bookings, cleaners, reload, setTab, onOpenBooking }: {
             })}
           </div>
 
-          <div
-            style={{
-              display: "flex",
-              gap: 16,
-              marginTop: 12,
-              fontSize: 12,
-              opacity: 0.8,
-              flexWrap: "wrap",
-            }}
-          >
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <div className="cal-legend">
+            <span>
               <span
+                className="cal-legend-swatch"
                 style={{
-                  display: "inline-block",
-                  width: 14,
-                  height: 14,
-                  borderRadius: 3,
                   background:
-                    "repeating-linear-gradient(45deg, rgba(255,255,255,0.05) 0 4px, rgba(255,255,255,0.12) 4px 8px)",
-                  border: "1px solid var(--color-border)",
+                    "repeating-linear-gradient(135deg, rgba(15,23,42,0.06) 0 4px, rgba(15,23,42,0.12) 4px 8px)",
                 }}
               />
               Closed day
             </span>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <span>
               <span
-                style={{
-                  display: "inline-block",
-                  width: 14,
-                  height: 14,
-                  borderRadius: 3,
-                  borderLeft: "3px solid rgba(245, 158, 11, 0.7)",
-                  border: "1px solid var(--color-border)",
-                  borderLeftWidth: 3,
-                  borderLeftColor: "rgba(245, 158, 11, 0.7)",
-                }}
+                className="cal-legend-swatch"
+                style={{ borderLeft: "3px solid var(--admin-warning)", border: "1px solid var(--admin-border)", borderLeftWidth: 3 }}
               />
               Has blocked time
             </span>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-              <span style={{ textDecoration: "line-through", opacity: 0.45 }}>3:00 PM Jane</span>
-              <span style={{ opacity: 0.7 }}>= canceled</span>
+            <span>
+              <span className="cal-more" style={{ textDecoration: "line-through", opacity: 0.55 }}>
+                Sample
+              </span>
+              {" "}
+              <span className="text-muted">= canceled</span>
             </span>
+          </div>
+        </>
+      )}
+
+      {view === "week" && (
+        <>
+          <div className="toolbar" style={{ marginBottom: 12 }}>
+            <button type="button" className="btn btn-outline btn-sm" onClick={() => shiftWeek(-1)}>
+              ← Prev week
+            </button>
+            <strong style={{ fontSize: 15 }}>
+              Week of{" "}
+              {weekStart.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })}
+            </strong>
+            <button type="button" className="btn btn-outline btn-sm" onClick={() => shiftWeek(1)}>
+              Next week →
+            </button>
+            <button
+              type="button"
+              className="btn btn-outline btn-sm"
+              onClick={() => setWeekStart(startOfWeekMonday(new Date()))}
+            >
+              This week
+            </button>
+          </div>
+          <div className="card card-flush">
+            {weekDays.map((dayDate) => {
+              const key = `${dayDate.getFullYear()}-${dayDate.getMonth()}-${dayDate.getDate()}`;
+              const dayBookings = (bookingsByDay.get(key) ?? [])
+                .slice()
+                .sort(
+                  (a, b) =>
+                    new Date(a.scheduledDate!).getTime() -
+                    new Date(b.scheduledDate!).getTime(),
+                );
+              const isToday = sameCalendarDay(dayDate, new Date());
+              return (
+                <div
+                  key={key}
+                  className={`agenda-day${isToday ? " today" : ""}`}
+                  style={{ gridTemplateColumns: "minmax(88px, 1fr) 4fr" }}
+                >
+                  <div>
+                    <div className="agenda-day-label">
+                      {dayDate.toLocaleDateString([], { weekday: "short" })}
+                    </div>
+                    <div className="agenda-day-date">{dayDate.getDate()}</div>
+                  </div>
+                  <div className="agenda-day-list">
+                    {dayBookings.length === 0 ? (
+                      <span className="agenda-empty">No appointments</span>
+                    ) : (
+                      dayBookings.map((b) => (
+                        <button
+                          key={b.id}
+                          type="button"
+                          className={`agenda-row${b.status === "CANCELED" ? " canceled" : ""}`}
+                          onClick={() => onOpenBooking(b.id)}
+                        >
+                          <span className="agenda-time">
+                            {new Date(b.scheduledDate!).toLocaleTimeString([], {
+                              hour: "numeric",
+                              minute: "2-digit",
+                            })}
+                          </span>
+                          <div className="agenda-row-body">
+                            <span className="agenda-row-name">{b.name}</span>
+                            <span className="agenda-row-sub">{b.serviceType || b.address}</span>
+                          </div>
+                          <StatusBadge status={b.status} />
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </>
       )}
@@ -2545,7 +3584,7 @@ function ScheduleTab({ bookings, cleaners, reload, setTab, onOpenBooking }: {
       {view === "list" && (
         <>
           {scheduledList.length === 0 ? (
-            <p style={{ opacity: 0.75 }}>No scheduled appointments yet.</p>
+            <EmptyState title="No scheduled appointments" hint="Approve bookings with dates or add a date on the booking." />
           ) : (
             <div className="admin-table-wrap">
               <table className="admin-table">
@@ -2567,43 +3606,40 @@ function ScheduleTab({ bookings, cleaners, reload, setTab, onOpenBooking }: {
                       >
                         <td style={{ whiteSpace: "nowrap" }}>{fmt(b.scheduledDate)}</td>
                         <td>{b.name}</td>
-                        <td>{b.serviceType || <span style={{ opacity: 0.5 }}>—</span>}</td>
+                        <td>{b.serviceType || <span className="text-subtle">—</span>}</td>
                         <td>{b.address}</td>
-                        <td><span style={pillStyle(b.status)}>{b.status}</span></td>
+                        <td><StatusBadge status={b.status} /></td>
                         <td>{cleanerName}</td>
                         <td onClick={(e) => e.stopPropagation()}>
-                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          <div className="row" style={{ gap: 6 }}>
                             {b.status !== "CONFIRMED" && b.status !== "CANCELED" && (
-                              <button
-                                onClick={() => setStatus(b.id, "CONFIRMED")}
-                                style={{ padding: "4px 10px", borderRadius: 8, border: "1px solid rgba(88,166,255,0.5)", color: "var(--color-secondary)", background: "transparent", cursor: "pointer", fontSize: 13 }}
-                              >
+                              <RowAction variant="primary" onClick={() => setStatus(b.id, "CONFIRMED")}>
                                 Approve
-                              </button>
+                              </RowAction>
                             )}
                             {b.status !== "CANCELED" && (
-                              <button
+                              <RowAction
+                                variant="danger"
                                 onClick={() => {
                                   if (window.confirm("Cancel this appointment? The customer will be emailed.")) {
                                     setStatus(b.id, "CANCELED");
                                   }
                                 }}
-                                style={{ padding: "4px 10px", borderRadius: 8, border: "1px solid rgba(239,68,68,0.4)", color: "#fca5a5", background: "transparent", cursor: "pointer", fontSize: 13 }}
                               >
                                 Cancel
-                              </button>
+                              </RowAction>
                             )}
                             {b.status !== "COMPLETED" && b.status !== "CANCELED" && (
-                              <button
+                              <RowAction
+                                variant="success"
                                 onClick={() => {
                                   if (window.confirm("Mark this appointment as complete?")) {
                                     setStatus(b.id, "COMPLETED");
                                   }
                                 }}
-                                style={{ padding: "4px 10px", borderRadius: 8, border: "1px solid rgba(34,197,94,0.4)", color: "#86efac", background: "transparent", cursor: "pointer", fontSize: 13 }}
                               >
                                 Complete
-                              </button>
+                              </RowAction>
                             )}
                           </div>
                         </td>
@@ -2639,9 +3675,9 @@ function ScheduleTab({ bookings, cleaners, reload, setTab, onOpenBooking }: {
                           <td>
                             <input
                               type="checkbox"
+                              className="checkbox"
                               checked={rule.enabled}
                               onChange={(e) => updateRule(dow, { enabled: e.target.checked })}
-                              style={{ width: 18, height: 18, accentColor: "var(--color-primary)" }}
                             />
                           </td>
                           <td>
@@ -2680,9 +3716,39 @@ function ScheduleTab({ bookings, cleaners, reload, setTab, onOpenBooking }: {
                   </tbody>
                 </table>
               </div>
-              <button className="btn btn-primary" onClick={saveConfig} disabled={savingCfg}>
-                {savingCfg ? "Saving..." : "Save Availability"}
-              </button>
+              <div className="stack">
+                <button className="btn btn-primary" onClick={saveConfig} disabled={savingCfg}>
+                  {savingCfg ? "Saving..." : "Save Availability"}
+                </button>
+                <div className="card" style={{ padding: 14 }}>
+                  <label style={{ marginBottom: 8 }}>
+                    Preview slots for a date (uses saved rules above after you save)
+                    <input
+                      type="date"
+                      className="input"
+                      value={slotPreviewDate}
+                      onChange={(e) => setSlotPreviewDate(e.target.value)}
+                    />
+                  </label>
+                  {slotPreviewDate ? (
+                    previewSlots.length === 0 ? (
+                      <p className="text-muted" style={{ margin: 0, fontSize: 13 }}>
+                        No slots — day may be disabled or hours invalid.
+                      </p>
+                    ) : (
+                      <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13 }}>
+                        {previewSlots.map((line) => (
+                          <li key={line}>{line}</li>
+                        ))}
+                      </ul>
+                    )
+                  ) : (
+                    <p className="text-muted" style={{ margin: 0, fontSize: 13 }}>
+                      Pick a date to see generated slot labels (local preview).
+                    </p>
+                  )}
+                </div>
+              </div>
             </>
           )}
         </>
@@ -2726,7 +3792,7 @@ function ScheduleTab({ bookings, cleaners, reload, setTab, onOpenBooking }: {
           </div>
 
           {blocked.length === 0 ? (
-            <p style={{ opacity: 0.75 }}>No blocked time ranges.</p>
+            <EmptyState title="No blocked ranges" hint="Add vacations or unavailable windows above." />
           ) : (
             <div className="admin-table-wrap">
               <table className="admin-table">
@@ -2736,16 +3802,13 @@ function ScheduleTab({ bookings, cleaners, reload, setTab, onOpenBooking }: {
                 <tbody>
                   {blocked.map((b) => (
                     <tr key={b.id}>
-                      <td style={{ whiteSpace: "nowrap" }}>{fmt(b.startAt)}</td>
-                      <td style={{ whiteSpace: "nowrap" }}>{fmt(b.endAt)}</td>
-                      <td>{b.reason || <span style={{ opacity: 0.5 }}>—</span>}</td>
+                      <td className="nowrap">{fmt(b.startAt)}</td>
+                      <td className="nowrap">{fmt(b.endAt)}</td>
+                      <td>{b.reason || <span className="text-subtle">—</span>}</td>
                       <td>
-                        <button
-                          onClick={() => removeBlock(b.id)}
-                          style={{ padding: "4px 10px", borderRadius: 8, border: "1px solid rgba(239,68,68,0.4)", color: "#fca5a5", background: "transparent", cursor: "pointer", fontSize: 13 }}
-                        >
+                        <RowAction variant="danger" onClick={() => removeBlock(b.id)}>
                           Remove
-                        </button>
+                        </RowAction>
                       </td>
                     </tr>
                   ))}
@@ -2772,53 +3835,42 @@ function ScheduleTab({ bookings, cleaners, reload, setTab, onOpenBooking }: {
           });
           return (
             <>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", gap: 16 }}>
+              <div className="modal-head">
                 <div>
-                  <h2 style={{ margin: 0, fontSize: 22 }}>{titleDate}</h2>
-                  <p style={{ marginTop: 4, opacity: 0.75, fontSize: 14 }}>
+                  <h2>{titleDate}</h2>
+                  <p className="subtitle">
                     {dayBookings.length} booking{dayBookings.length === 1 ? "" : "s"} scheduled
                   </p>
                 </div>
-                <button className="btn btn-outline" onClick={() => setOpenDayKey(null)} style={{ padding: "6px 14px", fontSize: 13 }}>Close</button>
+                <button type="button" className="btn btn-outline btn-sm" onClick={() => setOpenDayKey(null)}>
+                  Close
+                </button>
               </div>
 
               {dayBookings.length === 0 ? (
-                <p style={{ opacity: 0.75 }}>No bookings on this day.</p>
+                <p className="text-muted">No bookings on this day.</p>
               ) : (
-                <div style={{ display: "grid", gap: 8 }}>
+                <div className="stack">
                   {dayBookings.map((b) => (
                     <button
                       key={b.id}
                       type="button"
+                      className="agenda-row"
                       onClick={() => {
                         onOpenBooking(b.id);
                         setOpenDayKey(null);
                       }}
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: "auto 1fr auto",
-                        gap: 12,
-                        alignItems: "center",
-                        padding: "10px 12px",
-                        borderRadius: 8,
-                        border: "1px solid var(--color-border)",
-                        background: "var(--color-surface)",
-                        color: "inherit",
-                        font: "inherit",
-                        textAlign: "left",
-                        cursor: "pointer",
-                      }}
                     >
-                      <span style={{ fontWeight: 600, fontSize: 14, minWidth: 80 }}>
+                      <span className="agenda-time">
                         {new Date(b.scheduledDate!).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
                       </span>
-                      <span style={{ display: "grid", gap: 2, minWidth: 0 }}>
-                        <strong style={{ fontSize: 14 }}>{b.name}</strong>
-                        <span style={{ fontSize: 12, opacity: 0.75, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      <span className="agenda-row-body">
+                        <span className="agenda-row-name">{b.name}</span>
+                        <span className="agenda-row-sub">
                           {b.serviceType ? `${b.serviceType} · ` : ""}{b.address}
                         </span>
                       </span>
-                      <span style={pillStyle(b.status)}>{b.status}</span>
+                      <StatusBadge status={b.status} />
                     </button>
                   ))}
                 </div>
