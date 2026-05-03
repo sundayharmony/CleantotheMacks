@@ -45,24 +45,19 @@ function formatDate(d: string | null) {
   });
 }
 
-function statusStyle(status: string): React.CSSProperties {
-  const map: Record<string, { bg: string; color: string }> = {
-    assigned: { bg: "rgba(59,130,246,0.15)", color: "#3b82f6" },
-    in_progress: { bg: "rgba(234,179,8,0.15)", color: "#eab308" },
-    completed: { bg: "rgba(34,197,94,0.15)", color: "#22c55e" },
-    cancelled: { bg: "rgba(220,38,38,0.15)", color: "#dc2626" },
-  };
-  const s = map[status] || map.assigned;
-  return {
-    padding: "4px 12px",
-    borderRadius: 20,
-    fontSize: 12,
-    fontWeight: 600,
-    textTransform: "uppercase",
-    background: s.bg,
-    color: s.color,
-    display: "inline-block",
-  };
+function jobPillClass(status: string): string {
+  switch (status) {
+    case "assigned":
+      return "pill-info";
+    case "in_progress":
+      return "pill-warning";
+    case "completed":
+      return "pill-success";
+    case "cancelled":
+      return "pill-danger";
+    default:
+      return "pill-neutral";
+  }
 }
 
 export default function CleanerDashboard() {
@@ -91,7 +86,9 @@ export default function CleanerDashboard() {
       .finally(() => setLoading(false));
   }, [router]);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   async function handleLogout() {
     setLoggingOut(true);
@@ -107,10 +104,10 @@ export default function CleanerDashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      if (res.ok) {
-        loadData();
-      }
-    } catch { /* ignore */ }
+      if (res.ok) loadData();
+    } catch {
+      /* ignore */
+    }
     setUpdatingId(null);
   }
 
@@ -123,8 +120,8 @@ export default function CleanerDashboard() {
 
   if (loading) {
     return (
-      <section className="section" style={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <p style={{ color: "var(--color-muted)" }}>Loading your dashboard...</p>
+      <section className="section" style={{ minHeight: "50vh", display: "grid", placeItems: "center" }}>
+        <p className="text-muted">Loading your dashboard…</p>
       </section>
     );
   }
@@ -138,126 +135,157 @@ export default function CleanerDashboard() {
 
   return (
     <>
-      {/* Header */}
       <section className="section" style={{ paddingBottom: 0 }}>
         <div className="container">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+          <div
+            className="row"
+            style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}
+          >
             <div>
-              <h1 style={{ fontSize: 28, marginBottom: 4 }}>
+              <span className="hero-eyebrow">Cleaner portal</span>
+              <h1 className="section-title" style={{ marginTop: 10, marginBottom: 4 }}>
                 Hi, {cleaner.name.split(" ")[0]}
               </h1>
-              <p style={{ color: "var(--color-muted)" }}>{cleaner.email}</p>
+              <p className="text-muted">{cleaner.email}</p>
             </div>
             <button
+              type="button"
               onClick={handleLogout}
               disabled={loggingOut}
-              className="btn"
-              style={{
-                background: "var(--color-surface)",
-                border: "1px solid var(--color-border)",
-                color: "var(--color-text)",
-                cursor: "pointer",
-              }}
+              className="btn btn-outline"
             >
-              {loggingOut ? "Signing out..." : "Sign Out"}
+              {loggingOut ? "Signing out…" : "Sign Out"}
             </button>
           </div>
         </div>
       </section>
 
-      {/* Stats */}
-      <section className="section" style={{ paddingTop: 24, paddingBottom: 0 }}>
+      <section className="section section-tight" style={{ paddingTop: 24 }}>
         <div className="container">
-          <div className="card" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 16 }}>
-            <div style={{ textAlign: "center" }}>
-              <span style={{ fontSize: 12, color: "var(--color-muted)", textTransform: "uppercase", letterSpacing: 1 }}>Assigned</span>
-              <p style={{ fontSize: 28, fontWeight: 700, marginTop: 4 }}>{assigned.length}</p>
+          <div
+            className="card"
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+              gap: 16,
+              textAlign: "center",
+            }}
+          >
+            <div>
+              <span className="helper-text" style={{ textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                Assigned
+              </span>
+              <p style={{ fontSize: 28, fontWeight: 800, marginTop: 6 }}>{assigned.length}</p>
             </div>
-            <div style={{ textAlign: "center" }}>
-              <span style={{ fontSize: 12, color: "var(--color-muted)", textTransform: "uppercase", letterSpacing: 1 }}>In Progress</span>
-              <p style={{ fontSize: 28, fontWeight: 700, marginTop: 4, color: "#eab308" }}>{inProgress.length}</p>
+            <div>
+              <span className="helper-text" style={{ textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                In progress
+              </span>
+              <p style={{ fontSize: 28, fontWeight: 800, marginTop: 6, color: "var(--color-warning)" }}>
+                {inProgress.length}
+              </p>
             </div>
-            <div style={{ textAlign: "center" }}>
-              <span style={{ fontSize: 12, color: "var(--color-muted)", textTransform: "uppercase", letterSpacing: 1 }}>Completed</span>
-              <p style={{ fontSize: 28, fontWeight: 700, marginTop: 4, color: "#22c55e" }}>{completed.length}</p>
+            <div>
+              <span className="helper-text" style={{ textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                Completed
+              </span>
+              <p style={{ fontSize: 28, fontWeight: 800, marginTop: 6, color: "var(--color-success)" }}>
+                {completed.length}
+              </p>
             </div>
-            <div style={{ textAlign: "center" }}>
-              <span style={{ fontSize: 12, color: "var(--color-muted)", textTransform: "uppercase", letterSpacing: 1 }}>Earnings</span>
-              <p style={{ fontSize: 28, fontWeight: 700, marginTop: 4 }}>${totalEarned.toFixed(2)}</p>
+            <div>
+              <span className="helper-text" style={{ textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                Earnings
+              </span>
+              <p style={{ fontSize: 28, fontWeight: 800, marginTop: 6 }}>${totalEarned.toFixed(2)}</p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Active Jobs (Assigned + In Progress) */}
-      <section className="section" style={{ paddingTop: 24 }}>
-        <div className="container">
-          <h2 style={{ fontSize: 22, marginBottom: 16 }}>Active Jobs</h2>
+      <section className="section section-tight">
+        <div className="container full-bleed-auto">
+          <h2 className="section-title" style={{ fontSize: 22, marginBottom: 16 }}>
+            Active jobs
+          </h2>
           {assigned.length === 0 && inProgress.length === 0 ? (
-            <div className="card" style={{ textAlign: "center", padding: 32 }}>
-              <p style={{ color: "var(--color-muted)" }}>No active jobs right now. Check back soon!</p>
+            <div className="card text-center" style={{ padding: "36px 24px" }}>
+              <p className="text-muted">No active jobs right now. Check back soon!</p>
             </div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <div className="stack" style={{ gap: 16 }}>
               {[...inProgress, ...assigned].map((job) => (
-                <div key={job.id} className="card" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8 }}>
+                <div key={job.id} className="card stack" style={{ gap: 14 }}>
+                  <div
+                    className="row"
+                    style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}
+                  >
                     <div>
-                      <strong style={{ fontSize: 16 }}>{job.booking.name}</strong>
-                      <span style={{ ...statusStyle(job.status), marginLeft: 10 }}>{job.status.replace("_", " ")}</span>
+                      <strong style={{ fontSize: 17 }}>{job.booking.name}</strong>
+                      <span className={`pill ${jobPillClass(job.status)}`} style={{ marginLeft: 10 }}>
+                        {job.status.replace("_", " ")}
+                      </span>
                     </div>
-                    <span style={{ fontSize: 13, color: "var(--color-muted)" }}>
-                      {formatDate(job.booking.scheduledDate)}
-                    </span>
+                    <span className="helper-text">{formatDate(job.booking.scheduledDate)}</span>
                   </div>
 
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 8, fontSize: 14 }}>
+                  <div className="job-meta">
                     <div>
-                      <span style={{ color: "var(--color-muted)" }}>Address: </span>
-                      {job.booking.address}
+                      <span className="label">Address</span> {job.booking.address}
                     </div>
                     <div>
-                      <span style={{ color: "var(--color-muted)" }}>Size: </span>
-                      {job.booking.homeSize}
-                      {job.booking.sqft && ` (${job.booking.sqft} sqft)`}
+                      <span className="label">Size</span> {job.booking.homeSize}
+                      {job.booking.sqft ? ` (${job.booking.sqft} sqft)` : ""}
                     </div>
-                    {job.booking.phone && (
+                    {job.booking.phone ? (
                       <div>
-                        <span style={{ color: "var(--color-muted)" }}>Phone: </span>
-                        <a href={`tel:${job.booking.phone}`} style={{ color: "var(--color-primary)" }}>{job.booking.phone}</a>
+                        <span className="label">Phone</span>{" "}
+                        <a href={`tel:${job.booking.phone}`} style={{ color: "var(--color-primary)", fontWeight: 600 }}>
+                          {job.booking.phone}
+                        </a>
                       </div>
-                    )}
-                    {job.booking.serviceType && (
+                    ) : null}
+                    {job.booking.serviceType ? (
                       <div>
-                        <span style={{ color: "var(--color-muted)" }}>Service: </span>
-                        {job.booking.serviceType}
+                        <span className="label">Service</span> {job.booking.serviceType}
                       </div>
-                    )}
+                    ) : null}
                   </div>
 
-                  {job.booking.notes && (
-                    <div style={{ background: "var(--color-surface-2)", padding: "10px 14px", borderRadius: 8, fontSize: 14 }}>
+                  {job.booking.notes ? (
+                    <div
+                      style={{
+                        background: "var(--color-surface-2)",
+                        padding: "12px 14px",
+                        borderRadius: "var(--radius)",
+                        fontSize: 14,
+                        border: "1px solid var(--color-border)",
+                      }}
+                    >
                       <strong>Client notes:</strong> {job.booking.notes}
                     </div>
-                  )}
+                  ) : null}
 
-                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  <div className="row" style={{ gap: 10 }}>
                     {job.status === "assigned" && (
                       <button
+                        type="button"
                         onClick={() => updateJob(job.id, { status: "in_progress" })}
                         disabled={updatingId === job.id}
-                        className="btn btn-primary"
-                        style={{ fontSize: 14 }}
+                        className="btn btn-primary btn-sm"
                       >
-                        {updatingId === job.id ? "Updating..." : "Start Job"}
+                        {updatingId === job.id ? "Updating…" : "Start Job"}
                       </button>
                     )}
                     {job.status === "in_progress" && (
                       <button
-                        onClick={() => { setNotesModal(job); setNotes(job.completionNotes || ""); }}
+                        type="button"
+                        onClick={() => {
+                          setNotesModal(job);
+                          setNotes(job.completionNotes || "");
+                        }}
                         disabled={updatingId === job.id}
-                        className="btn btn-primary"
-                        style={{ fontSize: 14 }}
+                        className="btn btn-primary btn-sm"
                       >
                         Mark Complete
                       </button>
@@ -270,29 +298,41 @@ export default function CleanerDashboard() {
         </div>
       </section>
 
-      {/* Completed Jobs */}
       {completed.length > 0 && (
-        <section className="section" style={{ paddingTop: 0 }}>
-          <div className="container">
-            <h2 style={{ fontSize: 22, marginBottom: 16 }}>Completed Jobs</h2>
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <section className="section section-tight" style={{ paddingTop: 0 }}>
+          <div className="container full-bleed-auto">
+            <h2 className="section-title" style={{ fontSize: 22, marginBottom: 16 }}>
+              Completed jobs
+            </h2>
+            <div className="stack" style={{ gap: 12 }}>
               {completed.slice(0, 20).map((job) => (
-                <div key={job.id} className="card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, opacity: 0.85 }}>
+                <div
+                  key={job.id}
+                  className="card"
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    flexWrap: "wrap",
+                    gap: 12,
+                    opacity: 0.92,
+                  }}
+                >
                   <div>
                     <strong>{job.booking.name}</strong>
-                    <span style={{ color: "var(--color-muted)", marginLeft: 8, fontSize: 13 }}>
+                    <span className="text-muted" style={{ marginLeft: 8, fontSize: 13 }}>
                       {job.booking.address}
                     </span>
-                    <div style={{ fontSize: 13, color: "var(--color-muted)", marginTop: 4 }}>
+                    <div className="helper-text" style={{ marginTop: 4 }}>
                       {formatDate(job.booking.scheduledDate)}
-                      {job.completionNotes && ` - ${job.completionNotes}`}
+                      {job.completionNotes ? ` — ${job.completionNotes}` : ""}
                     </div>
                   </div>
-                  <div style={{ textAlign: "right" }}>
-                    <span style={statusStyle("completed")}>completed</span>
-                    {job.totalPay != null && (
-                      <div style={{ marginTop: 4, fontWeight: 600 }}>${job.totalPay.toFixed(2)}</div>
-                    )}
+                  <div className="text-right">
+                    <span className="pill pill-success">completed</span>
+                    {job.totalPay != null ? (
+                      <div style={{ marginTop: 6, fontWeight: 700 }}>${job.totalPay.toFixed(2)}</div>
+                    ) : null}
                   </div>
                 </div>
               ))}
@@ -301,67 +341,55 @@ export default function CleanerDashboard() {
         </section>
       )}
 
-      {/* Footer link */}
-      <section className="section" style={{ paddingTop: 0 }}>
-        <div className="container" style={{ textAlign: "center" }}>
-          <Link href="/" style={{ color: "var(--color-muted)", fontSize: 14 }}>
-            Back to Home
+      <section className="section section-tight" style={{ paddingTop: 0 }}>
+        <div className="container text-center">
+          <Link href="/" className="text-muted" style={{ fontSize: 14 }}>
+            ← Back to Home
           </Link>
         </div>
       </section>
 
-      {/* Completion notes modal */}
-      {notesModal && (
+      {notesModal ? (
         <div
           role="dialog"
+          aria-modal="true"
+          aria-labelledby="notes-modal-title"
+          className="modal-overlay"
           onClick={() => setNotesModal(null)}
-          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "grid", placeItems: "center", padding: 16, zIndex: 1000 }}
         >
-          <div className="card" onClick={(e) => e.stopPropagation()} style={{ width: "min(480px, 96vw)", display: "grid", gap: 14 }}>
-            <h3 style={{ fontSize: 18 }}>Complete Job: {notesModal.booking.name}</h3>
-            <p style={{ fontSize: 14, color: "var(--color-muted)" }}>{notesModal.booking.address}</p>
-            <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <span style={{ fontSize: 14, fontWeight: 500 }}>Completion Notes (optional)</span>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <h3 id="notes-modal-title">Complete job: {notesModal.booking.name}</h3>
+            </div>
+            <p className="text-muted" style={{ fontSize: 14 }}>
+              {notesModal.booking.address}
+            </p>
+            <label>
+              Completion notes (optional)
               <textarea
+                className="input"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 rows={4}
-                placeholder="Any notes about the job..."
-                style={{
-                  padding: "10px 12px",
-                  borderRadius: 8,
-                  border: "1px solid var(--color-border)",
-                  background: "var(--color-surface)",
-                  color: "var(--color-text)",
-                  fontSize: 14,
-                  resize: "vertical",
-                }}
+                placeholder="Any notes about the job…"
               />
             </label>
-            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-              <button
-                onClick={() => setNotesModal(null)}
-                className="btn"
-                style={{
-                  background: "var(--color-surface)",
-                  border: "1px solid var(--color-border)",
-                  color: "var(--color-text)",
-                  cursor: "pointer",
-                }}
-              >
+            <div className="modal-foot">
+              <button type="button" className="btn btn-outline" onClick={() => setNotesModal(null)}>
                 Cancel
               </button>
               <button
+                type="button"
+                className="btn btn-primary"
                 onClick={submitNotes}
                 disabled={updatingId === notesModal.id}
-                className="btn btn-primary"
               >
-                {updatingId === notesModal.id ? "Saving..." : "Mark Complete"}
+                {updatingId === notesModal.id ? "Saving…" : "Mark Complete"}
               </button>
             </div>
           </div>
         </div>
-      )}
+      ) : null}
     </>
   );
 }

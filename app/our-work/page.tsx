@@ -1,4 +1,8 @@
-import Image from "next/image";
+import PageHero from "../_components/PageHero";
+import SectionBand from "../_components/SectionBand";
+import FeatureCard from "../_components/FeatureCard";
+import CtaBanner from "../_components/CtaBanner";
+import BeforeAfter from "../_components/BeforeAfter";
 
 interface GalleryItem {
   id: string;
@@ -42,144 +46,71 @@ const fallbackItems: GalleryItem[] = [
   },
 ];
 
+const services: { title: string; detail: string; icon: "calendar" | "sparkle" | "home" | "kitchen" | "bath" | "plus" }[] = [
+  { title: "Recurring Cleanings", detail: "Weekly, bi-weekly, or monthly care for busy households.", icon: "calendar" },
+  { title: "Deep Cleans", detail: "A detailed reset for kitchens, bathrooms, and high-traffic areas.", icon: "sparkle" },
+  { title: "Move-In / Move-Out", detail: "A full refresh for empty homes before or after a move.", icon: "home" },
+  { title: "Kitchen Focus", detail: "Appliance exteriors, cabinet fronts, counters, and floors.", icon: "kitchen" },
+  { title: "Bath Refresh", detail: "Tile, tubs, sinks, and fixtures polished and sanitized.", icon: "bath" },
+  { title: "Add-ons", detail: "Inside fridge/oven, baseboards, windows, and more.", icon: "plus" },
+];
+
 export default async function OurWorkPage() {
   const dynamicItems = await getGalleryItems();
   const items = dynamicItems.length > 0 ? dynamicItems : fallbackItems;
 
   return (
     <>
-      <section className="section">
-        <div className="container">
-          <h1 style={{ fontSize: 40, marginBottom: 12 }}>Our Work</h1>
-          <p className="section-subtitle">
-            We customize every visit based on your home and priorities.
-          </p>
-        </div>
-      </section>
+      <PageHero
+        eyebrow="Our work"
+        title="See the difference, room by room."
+        subtitle="Each visit is tailored to your home and priorities. Tap any photo to see the after."
+        primaryCta={{ href: "/book", label: "Book a Cleaning" }}
+      />
 
-      <section className="section accent-band">
-        <div className="container">
-          <h2 className="section-title">Before &amp; After Highlights</h2>
-          <p className="section-subtitle">
-            Hover each card to see the transformation.
-          </p>
-          <div className="grid grid-2" style={{ marginTop: 24 }}>
-            {items.map((item) => {
-              const isExternal =
-                item.beforeImageUrl.startsWith("http://") ||
-                item.beforeImageUrl.startsWith("https://");
-              return (
-                <div key={item.id} className="card">
-                  <div
-                    className="before-after"
-                    style={{ marginBottom: 14, position: "relative" }}
-                  >
-                    {isExternal ? (
-                      <>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={item.beforeImageUrl}
-                          alt={`${item.title} before`}
-                          style={{
-                            position: "absolute",
-                            inset: 0,
-                            width: "100%",
-                            height: "100%",
-                            objectFit: "cover",
-                          }}
-                        />
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={item.afterImageUrl}
-                          alt={`${item.title} after`}
-                          className="after"
-                          style={{
-                            position: "absolute",
-                            inset: 0,
-                            width: "100%",
-                            height: "100%",
-                            objectFit: "cover",
-                          }}
-                        />
-                      </>
-                    ) : (
-                      <>
-                        <Image
-                          src={item.beforeImageUrl}
-                          alt={`${item.title} before`}
-                          fill
-                          style={{ objectFit: "cover" }}
-                          sizes="(max-width: 900px) 100vw, 50vw"
-                          priority={false}
-                        />
-                        <Image
-                          src={item.afterImageUrl}
-                          alt={`${item.title} after`}
-                          fill
-                          style={{ objectFit: "cover" }}
-                          className="after"
-                          sizes="(max-width: 900px) 100vw, 50vw"
-                          priority={false}
-                        />
-                      </>
-                    )}
-                  </div>
-                  <strong>{item.title}</strong>
-                  {item.description && (
-                    <p style={{ color: "var(--color-muted)", marginTop: 4 }}>
-                      {item.description}
-                    </p>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      <section className="section">
-        <div className="container">
-          <div className="grid grid-3">
-            {[
-              {
-                title: "Recurring Cleanings",
-                detail:
-                  "Weekly, bi-weekly, or monthly care for busy households.",
-              },
-              {
-                title: "Deep Cleans",
-                detail:
-                  "A detailed reset for kitchens, bathrooms, and high-traffic areas.",
-              },
-              {
-                title: "Move-In / Move-Out",
-                detail:
-                  "A full refresh for empty homes before or after a move.",
-              },
-              {
-                title: "Kitchen Focus",
-                detail:
-                  "Appliance exteriors, cabinet fronts, counters, and floors.",
-              },
-              {
-                title: "Bath Refresh",
-                detail:
-                  "Tile, tubs, sinks, and fixtures polished and sanitized.",
-              },
-              {
-                title: "Add-ons",
-                detail:
-                  "Inside fridge/oven, baseboards, windows, and more.",
-              },
-            ].map((service) => (
-              <div key={service.title} className="card">
-                <h3 style={{ marginBottom: 8 }}>{service.title}</h3>
-                <p style={{ color: "var(--color-muted)" }}>{service.detail}</p>
+      <SectionBand
+        title="Before & after highlights"
+        subtitle="Real results from recent visits."
+      >
+        <div className="grid grid-2">
+          {items.map((item) => (
+            <div key={item.id} className="card stack-sm" style={{ gap: 14 }}>
+              <BeforeAfter
+                beforeUrl={item.beforeImageUrl}
+                afterUrl={item.afterImageUrl}
+                title={item.title}
+              />
+              <div>
+                <strong style={{ fontSize: 16 }}>{item.title}</strong>
+                {item.description ? (
+                  <p className="text-muted" style={{ marginTop: 4, fontSize: 14 }}>
+                    {item.description}
+                  </p>
+                ) : null}
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
         </div>
-      </section>
+      </SectionBand>
+
+      <SectionBand
+        band={false}
+        title="What we can do for your home"
+        subtitle="Mix and match services so every visit feels just right."
+      >
+        <div className="grid grid-3">
+          {services.map((service) => (
+            <FeatureCard key={service.title} icon={service.icon} title={service.title} body={service.detail} />
+          ))}
+        </div>
+      </SectionBand>
+
+      <CtaBanner
+        title="See your home transformed."
+        subtitle="Tell us about your space and we'll match you with the right plan."
+        primaryCta={{ href: "/book", label: "Book Now" }}
+        secondaryCta={{ href: "/about", label: "About Us" }}
+      />
     </>
   );
 }

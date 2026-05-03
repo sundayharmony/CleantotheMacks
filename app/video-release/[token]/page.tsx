@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import SignVideoReleaseForm from "./SignVideoReleaseForm";
+import Alert from "../../_components/Alert";
 
 export const dynamic = "force-dynamic";
 
@@ -22,9 +23,14 @@ export default async function VideoReleasePage({
   if (!release) {
     return (
       <section className="section">
-        <div className="container">
-          <h1 style={{ fontSize: 34, marginBottom: 8 }}>Video Release Form</h1>
-          <p style={{ color: "tomato" }}>This release form link is invalid.</p>
+        <div className="container container-narrow">
+          <div className="card card-padded">
+            <h1 style={{ fontSize: 26, marginBottom: 16 }}>Video Release Form</h1>
+            <Alert variant="error" title="Invalid link.">
+              This release form link is invalid or no longer exists. If you
+              received this link from us, please contact our office for a new one.
+            </Alert>
+          </div>
         </div>
       </section>
     );
@@ -37,7 +43,7 @@ export default async function VideoReleasePage({
 
   return (
     <section className="section">
-      <div className="container" style={{ maxWidth: 760 }}>
+      <div className="container container-narrow">
         <SignVideoReleaseForm
           token={token}
           clientName={release.clientName}

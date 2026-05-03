@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Alert from "../../_components/Alert";
 
 export default function CleanerLoginPage() {
   const router = useRouter();
@@ -45,146 +46,90 @@ export default function CleanerLoginPage() {
   }
 
   return (
-    <section className="section" style={{ minHeight: "70vh", display: "flex", alignItems: "center" }}>
-      <div className="container" style={{ maxWidth: 440, margin: "0 auto" }}>
-        <h1 style={{ fontSize: 32, marginBottom: 8, textAlign: "center" }}>
-          Cleaner Portal
-        </h1>
-        <p className="section-subtitle" style={{ textAlign: "center", marginBottom: 32 }}>
+    <div className="auth-shell">
+      <div className="auth-card">
+        <h1>Cleaner Portal</h1>
+        <p className="auth-sub">
           {mode === "login"
             ? "Sign in to view your assigned jobs."
             : "Set up your password to get started."}
         </p>
 
-        <div
-          style={{
-            display: "flex",
-            gap: 0,
-            marginBottom: 24,
-            borderRadius: 8,
-            overflow: "hidden",
-            border: "1px solid var(--color-border)",
-          }}
-        >
+        <div className="segmented" role="tablist" aria-label="Sign in or set password">
           <button
             type="button"
-            onClick={() => { setMode("login"); setError(""); }}
-            style={{
-              flex: 1,
-              padding: "10px 0",
-              border: "none",
-              cursor: "pointer",
-              fontWeight: 600,
-              background: mode === "login" ? "var(--color-primary)" : "var(--color-surface)",
-              color: mode === "login" ? "#fff" : "var(--color-text)",
+            role="tab"
+            aria-selected={mode === "login"}
+            className={mode === "login" ? "active" : ""}
+            onClick={() => {
+              setMode("login");
+              setError("");
             }}
           >
             Sign In
           </button>
           <button
             type="button"
-            onClick={() => { setMode("setup"); setError(""); }}
-            style={{
-              flex: 1,
-              padding: "10px 0",
-              border: "none",
-              cursor: "pointer",
-              fontWeight: 600,
-              background: mode === "setup" ? "var(--color-primary)" : "var(--color-surface)",
-              color: mode === "setup" ? "#fff" : "var(--color-text)",
+            role="tab"
+            aria-selected={mode === "setup"}
+            className={mode === "setup" ? "active" : ""}
+            onClick={() => {
+              setMode("setup");
+              setError("");
             }}
           >
             Set Password
           </button>
         </div>
 
-        {error && (
-          <div
-            style={{
-              background: "rgba(220,38,38,0.1)",
-              border: "1px solid rgba(220,38,38,0.3)",
-              color: "#dc2626",
-              padding: "10px 14px",
-              borderRadius: 8,
-              marginBottom: 16,
-              fontSize: 14,
-            }}
-          >
-            {error}
-          </div>
-        )}
+        {error ? <Alert variant="error" live>{error}</Alert> : null}
 
-        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <span style={{ fontSize: 14, fontWeight: 500 }}>Email *</span>
+        <form onSubmit={handleSubmit}>
+          <label>
+            Email
             <input
+              className="input"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
               placeholder="Your work email"
-              style={{
-                padding: "10px 12px",
-                borderRadius: 8,
-                border: "1px solid var(--color-border)",
-                background: "var(--color-surface)",
-                color: "var(--color-text)",
-                fontSize: 15,
-              }}
+              autoComplete="email"
             />
-            {mode === "setup" && (
-              <span style={{ fontSize: 12, color: "var(--color-muted)" }}>
-                Use the email your admin registered you with.
-              </span>
-            )}
+            {mode === "setup" ? (
+              <span className="helper-text">Use the email your admin registered you with.</span>
+            ) : null}
           </label>
 
-          <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <span style={{ fontSize: 14, fontWeight: 500 }}>
-              {mode === "setup" ? "New Password *" : "Password *"}
-            </span>
+          <label>
+            {mode === "setup" ? "New password" : "Password"}
             <input
+              className="input"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={6}
-              style={{
-                padding: "10px 12px",
-                borderRadius: 8,
-                border: "1px solid var(--color-border)",
-                background: "var(--color-surface)",
-                color: "var(--color-text)",
-                fontSize: 15,
-              }}
+              autoComplete={mode === "setup" ? "new-password" : "current-password"}
             />
-            {mode === "setup" && (
-              <span style={{ fontSize: 12, color: "var(--color-muted)" }}>
-                At least 6 characters
-              </span>
-            )}
+            {mode === "setup" ? (
+              <span className="helper-text">At least 6 characters</span>
+            ) : null}
           </label>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="btn btn-primary"
-            style={{ marginTop: 8, padding: "12px 0", fontSize: 16, width: "100%" }}
-          >
+          <button type="submit" disabled={loading} className="btn btn-primary btn-lg btn-block">
             {loading
-              ? "Please wait..."
+              ? "Please wait…"
               : mode === "login"
-              ? "Sign In"
-              : "Set Password & Sign In"}
+                ? "Sign In"
+                : "Set Password & Sign In"}
           </button>
         </form>
 
-        <div style={{ textAlign: "center", marginTop: 24 }}>
-          <Link href="/" style={{ color: "var(--color-muted)", fontSize: 14 }}>
-            Back to Home
-          </Link>
+        <div className="auth-foot">
+          <Link href="/">← Back to Home</Link>
         </div>
       </div>
-    </section>
+    </div>
   );
 }

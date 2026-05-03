@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Alert from "../../_components/Alert";
 
 export default function PortalLoginPage() {
   const router = useRouter();
@@ -51,193 +52,124 @@ export default function PortalLoginPage() {
   }
 
   return (
-    <section className="section" style={{ minHeight: "70vh", display: "flex", alignItems: "center" }}>
-      <div className="container" style={{ maxWidth: 440, margin: "0 auto" }}>
-        <h1 style={{ fontSize: 32, marginBottom: 8, textAlign: "center" }}>
-          Client Portal
-        </h1>
-        <p className="section-subtitle" style={{ textAlign: "center", marginBottom: 32 }}>
+    <div className="auth-shell">
+      <div className="auth-card">
+        <h1>Client Portal</h1>
+        <p className="auth-sub">
           {mode === "login"
             ? "Sign in to view your bookings and history."
             : "Create an account to manage your bookings."}
         </p>
 
-        <div
-          style={{
-            display: "flex",
-            gap: 0,
-            marginBottom: 24,
-            borderRadius: 8,
-            overflow: "hidden",
-            border: "1px solid var(--color-border)",
-          }}
-        >
+        <div className="segmented" role="tablist" aria-label="Sign in or register">
           <button
             type="button"
-            onClick={() => { setMode("login"); setError(""); }}
-            style={{
-              flex: 1,
-              padding: "10px 0",
-              border: "none",
-              cursor: "pointer",
-              fontWeight: 600,
-              background: mode === "login" ? "var(--color-primary)" : "var(--color-surface)",
-              color: mode === "login" ? "#fff" : "var(--color-text)",
+            role="tab"
+            aria-selected={mode === "login"}
+            className={mode === "login" ? "active" : ""}
+            onClick={() => {
+              setMode("login");
+              setError("");
             }}
           >
             Sign In
           </button>
           <button
             type="button"
-            onClick={() => { setMode("register"); setError(""); }}
-            style={{
-              flex: 1,
-              padding: "10px 0",
-              border: "none",
-              cursor: "pointer",
-              fontWeight: 600,
-              background: mode === "register" ? "var(--color-primary)" : "var(--color-surface)",
-              color: mode === "register" ? "#fff" : "var(--color-text)",
+            role="tab"
+            aria-selected={mode === "register"}
+            className={mode === "register" ? "active" : ""}
+            onClick={() => {
+              setMode("register");
+              setError("");
             }}
           >
             Register
           </button>
         </div>
 
-        {error && (
-          <div
-            style={{
-              background: "rgba(220,38,38,0.1)",
-              border: "1px solid rgba(220,38,38,0.3)",
-              color: "#dc2626",
-              padding: "10px 14px",
-              borderRadius: 8,
-              marginBottom: 16,
-              fontSize: 14,
-            }}
-          >
-            {error}
-          </div>
-        )}
+        {error ? <Alert variant="error" live>{error}</Alert> : null}
 
-        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <form onSubmit={handleSubmit}>
           {mode === "register" && (
             <>
-              <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <span style={{ fontSize: 14, fontWeight: 500 }}>Full Name *</span>
+              <label>
+                Full name
                 <input
+                  className="input"
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required
-                  style={{
-                    padding: "10px 12px",
-                    borderRadius: 8,
-                    border: "1px solid var(--color-border)",
-                    background: "var(--color-surface)",
-                    color: "var(--color-text)",
-                    fontSize: 15,
-                  }}
+                  autoComplete="name"
                 />
               </label>
-              <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <span style={{ fontSize: 14, fontWeight: 500 }}>Address *</span>
+              <label>
+                Address
                 <input
+                  className="input"
                   type="text"
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
                   required
-                  style={{
-                    padding: "10px 12px",
-                    borderRadius: 8,
-                    border: "1px solid var(--color-border)",
-                    background: "var(--color-surface)",
-                    color: "var(--color-text)",
-                    fontSize: 15,
-                  }}
+                  autoComplete="street-address"
                 />
               </label>
-              <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <span style={{ fontSize: 14, fontWeight: 500 }}>Phone (optional)</span>
+              <label>
+                Phone (optional)
                 <input
+                  className="input"
                   type="tel"
+                  inputMode="tel"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  style={{
-                    padding: "10px 12px",
-                    borderRadius: 8,
-                    border: "1px solid var(--color-border)",
-                    background: "var(--color-surface)",
-                    color: "var(--color-text)",
-                    fontSize: 15,
-                  }}
+                  autoComplete="tel"
                 />
               </label>
             </>
           )}
 
-          <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <span style={{ fontSize: 14, fontWeight: 500 }}>Email *</span>
+          <label>
+            Email
             <input
+              className="input"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              style={{
-                padding: "10px 12px",
-                borderRadius: 8,
-                border: "1px solid var(--color-border)",
-                background: "var(--color-surface)",
-                color: "var(--color-text)",
-                fontSize: 15,
-              }}
+              autoComplete="email"
             />
           </label>
 
-          <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <span style={{ fontSize: 14, fontWeight: 500 }}>Password *</span>
+          <label>
+            Password
             <input
+              className="input"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={6}
-              style={{
-                padding: "10px 12px",
-                borderRadius: 8,
-                border: "1px solid var(--color-border)",
-                background: "var(--color-surface)",
-                color: "var(--color-text)",
-                fontSize: 15,
-              }}
+              autoComplete={mode === "login" ? "current-password" : "new-password"}
             />
-            {mode === "register" && (
-              <span style={{ fontSize: 12, color: "var(--color-muted)" }}>
-                At least 6 characters
-              </span>
-            )}
+            {mode === "register" ? (
+              <span className="helper-text">At least 6 characters</span>
+            ) : null}
           </label>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="btn btn-primary"
-            style={{ marginTop: 8, padding: "12px 0", fontSize: 16, width: "100%" }}
-          >
+          <button type="submit" disabled={loading} className="btn btn-primary btn-lg btn-block">
             {loading
-              ? "Please wait..."
+              ? "Please wait…"
               : mode === "login"
-              ? "Sign In"
-              : "Create Account"}
+                ? "Sign In"
+                : "Create Account"}
           </button>
         </form>
 
-        <div style={{ textAlign: "center", marginTop: 24 }}>
-          <Link href="/" style={{ color: "var(--color-muted)", fontSize: 14 }}>
-            Back to Home
-          </Link>
+        <div className="auth-foot">
+          <Link href="/">← Back to Home</Link>
         </div>
       </div>
-    </section>
+    </div>
   );
 }

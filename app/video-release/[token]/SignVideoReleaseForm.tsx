@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Alert from "../../_components/Alert";
 
 type Props = {
   token: string;
@@ -33,15 +34,12 @@ export default function SignVideoReleaseForm({
       const res = await fetch("/api/video-release/sign", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          token,
-          signerName,
-          signatureText,
-          agreed,
-        }),
+        body: JSON.stringify({ token, signerName, signatureText, agreed }),
       });
 
-      const data = (await res.json().catch(() => null)) as { error?: string; alreadySigned?: boolean } | null;
+      const data = (await res.json().catch(() => null)) as
+        | { error?: string; alreadySigned?: boolean }
+        | null;
       if (!res.ok) {
         setError(data?.error || "Failed to submit signature");
         return;
@@ -56,60 +54,128 @@ export default function SignVideoReleaseForm({
   }
 
   if (expired) {
-    return <p style={{ color: "tomato" }}>This video release link has expired. Please contact our office for a new link.</p>;
+    return (
+      <div className="card card-padded">
+        <h1 style={{ fontSize: 26, marginBottom: 12 }}>Video Release Form</h1>
+        <Alert variant="warning" title="This link has expired.">
+          Please contact our office and we&apos;ll send you a new release link.
+        </Alert>
+      </div>
+    );
   }
 
   if (success) {
-    return <p style={{ color: "limegreen" }}>Thank you. Your video release form has been signed successfully.</p>;
+    return (
+      <div className="card card-padded text-center">
+        <div
+          style={{
+            width: 64,
+            height: 64,
+            borderRadius: "50%",
+            background: "var(--color-success-soft)",
+            color: "var(--color-success)",
+            display: "grid",
+            placeItems: "center",
+            margin: "0 auto 16px",
+          }}
+          aria-hidden="true"
+        >
+          <svg
+            width="30"
+            height="30"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="m5 12 5 5L20 7" />
+          </svg>
+        </div>
+        <h1 style={{ fontSize: 26, marginBottom: 8 }}>Thank you!</h1>
+        <p className="text-muted" style={{ fontSize: 15 }}>
+          Your video release form has been signed successfully.
+        </p>
+      </div>
+    );
   }
 
+  const canSubmit =
+    !!agreed && signerName.trim().length > 0 && signatureText.trim().length > 0 && !loading;
+
   return (
-    <form onSubmit={onSubmit} className="card" style={{ display: "grid", gap: 14 }}>
-      <h2 style={{ margin: 0, fontSize: 24 }}>Video Release Form</h2>
-      <p style={{ color: "var(--color-muted)", margin: 0 }}>
-        I, <strong>{clientName}</strong>, authorize Clean to the Macks to use
-        photo and video content from services performed at my property for
-        marketing and portfolio purposes (website, social media, and promotional materials).
-      </p>
-      {propertyAddress && (
-        <p style={{ color: "var(--color-muted)", margin: 0 }}>
-          <strong>Property address:</strong> {propertyAddress}
+    <form onSubmit={onSubmit} className="card card-padded" style={{ display: "grid", gap: 18 }}>
+      <header>
+        <span className="hero-eyebrow">Video release</span>
+        <h1 style={{ fontSize: 28, marginTop: 10, marginBottom: 6 }}>Sign your release form</h1>
+        <p className="text-muted" style={{ fontSize: 15 }}>
+          Please review and sign below. This authorizes Clean to the Macks to
+          use photo and video of services performed at your property.
         </p>
-      )}
+      </header>
+
+      <div className="terms-box" tabIndex={0} role="region" aria-label="Authorization terms">
+        <p>
+          I, <strong>{clientName}</strong>, authorize Clean to the Macks to
+          capture and use photo and video content from services performed at my
+          property for marketing and portfolio purposes (website, social media,
+          and promotional materials).
+        </p>
+        {propertyAddress ? (
+          <p>
+            <strong>Property address:</strong> {propertyAddress}
+          </p>
+        ) : null}
+        <p>
+          I confirm I have authority to grant this release and waive any claim
+          for compensation related to the use of these materials. I understand
+          this consent can be revoked in writing at any time.
+        </p>
+      </div>
+
       <label>
-        Printed Name *
+        Printed name
         <input
           className="input"
           required
           value={signerName}
           onChange={(e) => setSignerName(e.target.value)}
           placeholder="Your full legal name"
+          autoComplete="name"
         />
       </label>
       <label>
-        Electronic Signature *
+        Electronic signature
         <input
           className="input"
           required
           value={signatureText}
           onChange={(e) => setSignatureText(e.target.value)}
           placeholder="Type your full name to sign"
+          autoComplete="off"
         />
       </label>
-      <label style={{ display: "flex", gap: 10, alignItems: "start" }}>
+      <label className="inline" style={{ alignItems: "flex-start" }}>
         <input
           type="checkbox"
           checked={agreed}
           onChange={(e) => setAgreed(e.target.checked)}
-          style={{ marginTop: 4 }}
+          style={{ width: 20, height: 20, accentColor: "var(--color-primary)", marginTop: 2 }}
         />
-        <span>
+        <span style={{ fontWeight: 500, fontSize: 14, color: "var(--color-text)" }}>
           I confirm this electronic signature is mine and I agree to this video release.
         </span>
       </label>
-      {error && <p style={{ color: "tomato", margin: 0 }}>{error}</p>}
-      <button type="submit" className="btn btn-primary" disabled={loading}>
-        {loading ? "Submitting..." : "Sign Release Form"}
+
+      {error ? <Alert variant="error" live>{error}</Alert> : null}
+
+      <button
+        type="submit"
+        className="btn btn-primary btn-lg"
+        disabled={!canSubmit}
+      >
+        {loading ? "Submitting…" : "Sign release form"}
       </button>
     </form>
   );

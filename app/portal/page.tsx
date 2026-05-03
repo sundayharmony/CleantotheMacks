@@ -33,6 +33,24 @@ interface Booking {
   } | null;
 }
 
+function bookingPillClass(raw: string): string {
+  const s = raw.toLowerCase();
+  if (s === "cancelled" || s === "canceled") return "pill-danger";
+  if (s === "completed") return "pill-success";
+  if (s === "assigned" || s === "in_progress") return "pill-info";
+  if (s === "confirmed" || s === "pending") return "pill-warning";
+  return "pill-neutral";
+}
+
+function formatDate(d: string) {
+  return new Date(d).toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
 export default function PortalDashboard() {
   const router = useRouter();
   const [client, setClient] = useState<ClientInfo | null>(null);
@@ -64,8 +82,8 @@ export default function PortalDashboard() {
 
   if (loading) {
     return (
-      <section className="section" style={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <p style={{ color: "var(--color-muted)" }}>Loading your dashboard...</p>
+      <section className="section" style={{ minHeight: "50vh", display: "grid", placeItems: "center" }}>
+        <p className="text-muted">Loading your dashboard…</p>
       </section>
     );
   }
@@ -73,173 +91,162 @@ export default function PortalDashboard() {
   if (!client) return null;
 
   const upcoming = bookings.filter(
-    (b) => b.status === "pending" || b.status === "confirmed" || (b.cleaningJob && b.cleaningJob.status === "assigned")
+    (b) =>
+      b.status === "pending" ||
+      b.status === "confirmed" ||
+      (b.cleaningJob && b.cleaningJob.status === "assigned"),
   );
   const past = bookings.filter(
-    (b) => b.cleaningJob?.status === "completed" || b.status === "cancelled"
+    (b) => b.cleaningJob?.status === "completed" || b.status === "cancelled",
   );
-
-  function formatDate(d: string) {
-    return new Date(d).toLocaleDateString("en-US", {
-      weekday: "short",
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-  }
 
   return (
     <>
       <section className="section" style={{ paddingBottom: 0 }}>
         <div className="container">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+          <div
+            className="row"
+            style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}
+          >
             <div>
-              <h1 style={{ fontSize: 28, marginBottom: 4 }}>
+              <span className="hero-eyebrow">Client portal</span>
+              <h1 className="section-title" style={{ marginTop: 10, marginBottom: 4 }}>
                 Welcome back, {client.name?.split(" ")[0] || "there"}
               </h1>
-              <p style={{ color: "var(--color-muted)" }}>{client.email}</p>
+              <p className="text-muted">{client.email}</p>
             </div>
-            <div style={{ display: "flex", gap: 10 }}>
+            <div className="row" style={{ gap: 10 }}>
               <Link href="/book" className="btn btn-primary">
                 Book a Cleaning
               </Link>
               <button
+                type="button"
                 onClick={handleLogout}
                 disabled={loggingOut}
-                className="btn"
-                style={{
-                  background: "var(--color-surface)",
-                  border: "1px solid var(--color-border)",
-                  color: "var(--color-text)",
-                  cursor: "pointer",
-                }}
+                className="btn btn-outline"
               >
-                {loggingOut ? "Signing out..." : "Sign Out"}
+                {loggingOut ? "Signing out…" : "Sign Out"}
               </button>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Profile Summary */}
-      <section className="section" style={{ paddingTop: 24, paddingBottom: 0 }}>
+      <section className="section section-tight" style={{ paddingTop: 24 }}>
         <div className="container">
           <div className="card" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16 }}>
-            <div>
-              <span style={{ fontSize: 12, color: "var(--color-muted)", textTransform: "uppercase", letterSpacing: 1 }}>Address</span>
-              <p style={{ marginTop: 4 }}>{client.address || "Not set"}</p>
+            <div style={{ padding: "4px 0" }}>
+              <span className="helper-text" style={{ textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                Address
+              </span>
+              <p style={{ marginTop: 6, fontWeight: 500 }}>{client.address || "Not set"}</p>
             </div>
-            <div>
-              <span style={{ fontSize: 12, color: "var(--color-muted)", textTransform: "uppercase", letterSpacing: 1 }}>Phone</span>
-              <p style={{ marginTop: 4 }}>{client.phone || "Not set"}</p>
+            <div style={{ padding: "4px 0" }}>
+              <span className="helper-text" style={{ textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                Phone
+              </span>
+              <p style={{ marginTop: 6, fontWeight: 500 }}>{client.phone || "Not set"}</p>
             </div>
-            <div>
-              <span style={{ fontSize: 12, color: "var(--color-muted)", textTransform: "uppercase", letterSpacing: 1 }}>Preferred Day</span>
-              <p style={{ marginTop: 4 }}>{client.preferredDay || "Any"}</p>
+            <div style={{ padding: "4px 0" }}>
+              <span className="helper-text" style={{ textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                Preferred day
+              </span>
+              <p style={{ marginTop: 6, fontWeight: 500 }}>{client.preferredDay || "Any"}</p>
             </div>
-            <div>
-              <span style={{ fontSize: 12, color: "var(--color-muted)", textTransform: "uppercase", letterSpacing: 1 }}>Total Bookings</span>
-              <p style={{ marginTop: 4, fontWeight: 600, fontSize: 20 }}>{bookings.length}</p>
+            <div style={{ padding: "4px 0" }}>
+              <span className="helper-text" style={{ textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                Total bookings
+              </span>
+              <p style={{ marginTop: 6, fontWeight: 800, fontSize: 22 }}>{bookings.length}</p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Upcoming Bookings */}
-      <section className="section" style={{ paddingTop: 24 }}>
+      <section className="section section-tight">
         <div className="container">
-          <h2 style={{ fontSize: 22, marginBottom: 16 }}>Upcoming Bookings</h2>
+          <h2 className="section-title" style={{ fontSize: 22, marginBottom: 16 }}>
+            Upcoming bookings
+          </h2>
           {upcoming.length === 0 ? (
-            <div className="card" style={{ textAlign: "center", padding: 32 }}>
-              <p style={{ color: "var(--color-muted)", marginBottom: 16 }}>
-                No upcoming bookings.
+            <div className="card text-center" style={{ padding: "40px 24px" }}>
+              <p className="text-muted" style={{ marginBottom: 16 }}>
+                No upcoming bookings yet.
               </p>
               <Link href="/book" className="btn btn-primary">
                 Schedule a Cleaning
               </Link>
             </div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {upcoming.map((b) => (
-                <div key={b.id} className="card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
-                  <div>
-                    <strong>{formatDate(b.date)}</strong>
-                    <span style={{ color: "var(--color-muted)", marginLeft: 8 }}>{b.time}</span>
-                    <div style={{ fontSize: 13, color: "var(--color-muted)", marginTop: 4 }}>
-                      {b.bedrooms} bed / {b.bathrooms} bath &middot; {b.frequency}
-                      {b.extras?.length > 0 && ` + ${b.extras.join(", ")}`}
-                    </div>
-                  </div>
-                  <span
+            <div className="stack" style={{ gap: 12 }}>
+              {upcoming.map((b) => {
+                const label = b.cleaningJob?.status || b.status;
+                return (
+                  <div
+                    key={b.id}
+                    className="card"
                     style={{
-                      padding: "4px 12px",
-                      borderRadius: 20,
-                      fontSize: 12,
-                      fontWeight: 600,
-                      textTransform: "uppercase",
-                      background:
-                        b.cleaningJob?.status === "assigned"
-                          ? "rgba(59,130,246,0.15)"
-                          : "rgba(234,179,8,0.15)",
-                      color:
-                        b.cleaningJob?.status === "assigned"
-                          ? "#3b82f6"
-                          : "#eab308",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      flexWrap: "wrap",
+                      gap: 12,
                     }}
                   >
-                    {b.cleaningJob?.status || b.status}
-                  </span>
-                </div>
-              ))}
+                    <div>
+                      <strong>{formatDate(b.date)}</strong>
+                      <span className="text-muted" style={{ marginLeft: 8 }}>
+                        {b.time}
+                      </span>
+                      <div className="helper-text" style={{ marginTop: 6 }}>
+                        {b.bedrooms} bed / {b.bathrooms} bath · {b.frequency}
+                        {b.extras?.length > 0 ? ` + ${b.extras.join(", ")}` : ""}
+                      </div>
+                    </div>
+                    <span className={`pill ${bookingPillClass(label)}`}>{label}</span>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
       </section>
 
-      {/* Past History */}
       {past.length > 0 && (
-        <section className="section" style={{ paddingTop: 0 }}>
-          <div className="container">
-            <h2 style={{ fontSize: 22, marginBottom: 16 }}>Past Cleanings</h2>
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {past.map((b) => (
-                <div
-                  key={b.id}
-                  className="card"
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    flexWrap: "wrap",
-                    gap: 12,
-                    opacity: 0.8,
-                  }}
-                >
-                  <div>
-                    <strong>{formatDate(b.date)}</strong>
-                    <span style={{ color: "var(--color-muted)", marginLeft: 8 }}>{b.time}</span>
-                    <div style={{ fontSize: 13, color: "var(--color-muted)", marginTop: 4 }}>
-                      {b.bedrooms} bed / {b.bathrooms} bath &middot; {b.frequency}
-                    </div>
-                  </div>
-                  <span
+        <section className="section section-tight" style={{ paddingTop: 0 }}>
+          <div className="container full-bleed-auto">
+            <h2 className="section-title" style={{ fontSize: 22, marginBottom: 16 }}>
+              Past cleanings
+            </h2>
+            <div className="stack" style={{ gap: 12 }}>
+              {past.map((b) => {
+                const label = b.cleaningJob?.status || b.status;
+                return (
+                  <div
+                    key={b.id}
+                    className="card"
                     style={{
-                      padding: "4px 12px",
-                      borderRadius: 20,
-                      fontSize: 12,
-                      fontWeight: 600,
-                      textTransform: "uppercase",
-                      background:
-                        b.status === "cancelled"
-                          ? "rgba(220,38,38,0.15)"
-                          : "rgba(34,197,94,0.15)",
-                      color: b.status === "cancelled" ? "#dc2626" : "#22c55e",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      flexWrap: "wrap",
+                      gap: 12,
+                      opacity: 0.92,
                     }}
                   >
-                    {b.cleaningJob?.status || b.status}
-                  </span>
-                </div>
-              ))}
+                    <div>
+                      <strong>{formatDate(b.date)}</strong>
+                      <span className="text-muted" style={{ marginLeft: 8 }}>
+                        {b.time}
+                      </span>
+                      <div className="helper-text" style={{ marginTop: 6 }}>
+                        {b.bedrooms} bed / {b.bathrooms} bath · {b.frequency}
+                      </div>
+                    </div>
+                    <span className={`pill ${bookingPillClass(label)}`}>{label}</span>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </section>

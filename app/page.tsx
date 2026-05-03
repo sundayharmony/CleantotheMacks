@@ -1,5 +1,11 @@
 import Image from "next/image";
 import { prisma } from "@/lib/db";
+import PageHero from "./_components/PageHero";
+import StatStrip from "./_components/StatStrip";
+import SectionBand from "./_components/SectionBand";
+import FeatureCard from "./_components/FeatureCard";
+import TestimonialCard from "./_components/TestimonialCard";
+import CtaBanner from "./_components/CtaBanner";
 
 export const dynamic = "force-dynamic";
 
@@ -37,132 +43,103 @@ async function getTestimonials(): Promise<Testimonial[]> {
   }
 }
 
-export default async function Home() {
-  const services = [
-    {
-      title: "Standard Cleaning",
-      detail: "Recurring or one-time visits for kitchens, baths, bedrooms, and living areas.",
-    },
-    {
-      title: "Deep Cleaning",
-      detail: "Detailed, top-to-bottom reset for move-ins, move-outs, or seasonal refresh.",
-    },
-    {
-      title: "Add-on Focus",
-      detail: "Appliance interiors, inside cabinets, baseboards, and more on request.",
-    },
-    {
-      title: "Interior Painting",
-      detail: "Refresh rooms with clean, professional painting for walls, trim, and touch-ups.",
-    },
-  ];
+const services: { title: string; detail: string; icon: "broom" | "sparkle" | "plus" | "paint" }[] = [
+  {
+    title: "Standard Cleaning",
+    detail: "Recurring or one-time visits for kitchens, baths, bedrooms, and living areas.",
+    icon: "broom",
+  },
+  {
+    title: "Deep Cleaning",
+    detail: "Detailed, top-to-bottom reset for move-ins, move-outs, or seasonal refresh.",
+    icon: "sparkle",
+  },
+  {
+    title: "Add-on Focus",
+    detail: "Appliance interiors, inside cabinets, baseboards, and more on request.",
+    icon: "plus",
+  },
+  {
+    title: "Interior Painting",
+    detail: "Refresh rooms with clean, professional painting for walls, trim, and touch-ups.",
+    icon: "paint",
+  },
+];
 
+const stats = [
+  { value: "500+", label: "Homes refreshed" },
+  { value: "4.9★", label: "Average rating" },
+  { value: "48 hr", label: "Flexible booking" },
+];
+
+export default async function Home() {
   const testimonials = await getTestimonials();
 
   return (
     <>
-      <section className="section">
-        <div className="container hero">
-          <div className="stack">
-            <span className="hero-badge">Trusted home cleaning</span>
-            <h1 style={{ fontSize: 52, lineHeight: 1.05 }}>
-              Cleaning and painting services, done right every time.
-            </h1>
-            <p className="section-subtitle">
-              Book reliable residential cleaning and interior painting with a
-              friendly crew, clear communication, and professional results.
-            </p>
-            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-              <a className="btn btn-primary" href="/book">
-                Book a Cleaning
-              </a>
-              <a className="btn btn-outline" href="/our-work">
-                View Our Work
-              </a>
-            </div>
-            <div className="hero-panel">
-              <div className="grid grid-3">
-                <div className="stat">
-                  <strong>500+</strong>
-                  <span style={{ color: "var(--color-muted)" }}>Homes refreshed</span>
-                </div>
-                <div className="stat">
-                  <strong>4.9&#9733;</strong>
-                  <span style={{ color: "var(--color-muted)" }}>Client rating</span>
-                </div>
-                <div className="stat">
-                  <strong>48hr</strong>
-                  <span style={{ color: "var(--color-muted)" }}>Flexible booking</span>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="image-card" style={{ minHeight: 360 }}>
+      <PageHero
+        eyebrow="Trusted home cleaning"
+        title="Cleaning and painting services, done right every time."
+        subtitle="Book reliable residential cleaning and interior painting with a friendly crew, clear communication, and professional results."
+        primaryCta={{ href: "/book", label: "Book a Cleaning" }}
+        secondaryCta={{ href: "/our-work", label: "View Our Work" }}
+        media={
+          <div className="media media-tall">
             <Image
               src="/hero.jpg"
-              alt="Clean living room"
-              width={1200}
-              height={800}
-              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              alt="Bright, freshly cleaned living room"
+              fill
               priority
+              sizes="(max-width: 1024px) 100vw, 540px"
+              style={{ objectFit: "cover" }}
             />
           </div>
+        }
+      >
+        <div style={{ marginTop: 8 }}>
+          <StatStrip items={stats} />
         </div>
-      </section>
+      </PageHero>
 
-      <section className="section accent-band">
-        <div className="container">
-          <h2 className="section-title">Services</h2>
-          <p className="section-subtitle">
-            Choose a plan that fits your home. We tailor every visit to the spaces
-            that matter most.
-          </p>
-          <div className="grid grid-3" style={{ marginTop: 24 }}>
-            {services.map((service) => (
-              <div key={service.title} className="card">
-                <h3 style={{ marginBottom: 8 }}>{service.title}</h3>
-                <p style={{ color: "var(--color-muted)" }}>{service.detail}</p>
-              </div>
-            ))}
-          </div>
+      <SectionBand
+        title="Services to fit every home"
+        subtitle="Choose a plan that fits your space. We tailor every visit to the rooms that matter most."
+      >
+        <div className="grid grid-auto-260">
+          {services.map((service) => (
+            <FeatureCard
+              key={service.title}
+              icon={service.icon}
+              title={service.title}
+              body={service.detail}
+            />
+          ))}
         </div>
-      </section>
+      </SectionBand>
 
-      <section className="section">
-        <div className="container">
-          <h2 className="section-title">Testimonials</h2>
-          <p className="section-subtitle">
-            Homeowners trust us for consistent, high-quality cleaning.
-          </p>
-          <div className="grid grid-3" style={{ marginTop: 24 }}>
-            {testimonials.map((item) => (
-              <div key={item.id} className="card">
-                {item.rating && (
-                  <div style={{ marginBottom: 8, color: "#fbbf24" }}>
-                    {"\u2605".repeat(item.rating)}{"\u2606".repeat(5 - item.rating)}
-                  </div>
-                )}
-                <p style={{ marginBottom: 16, color: "var(--color-muted)" }}>
-                  &ldquo;{item.quote}&rdquo;
-                </p>
-                <strong>{item.name}</strong>
-              </div>
-            ))}
-          </div>
+      <SectionBand
+        band={false}
+        title="Loved by homeowners"
+        subtitle="Real reviews from neighbors who trust us with their home."
+      >
+        <div className="grid grid-auto-260">
+          {testimonials.map((item) => (
+            <TestimonialCard
+              key={item.id}
+              name={item.name}
+              quote={item.quote}
+              rating={item.rating}
+            />
+          ))}
         </div>
-      </section>
+      </SectionBand>
 
-      <section className="section">
-        <div className="container" style={{ textAlign: "center" }}>
-          <h2 className="section-title">Ready to book your clean?</h2>
-          <p className="section-subtitle" style={{ margin: "0 auto 24px" }}>
-            Tell us about your home and we&apos;ll take care of the rest.
-          </p>
-          <a className="btn btn-primary" href="/book">
-            Book Now
-          </a>
-        </div>
-      </section>
+      <CtaBanner
+        title="Ready for a fresh start?"
+        subtitle="Tell us about your home and we'll take care of the rest."
+        primaryCta={{ href: "/book", label: "Book Now" }}
+        secondaryCta={{ href: "/service-area", label: "Check Service Area" }}
+      />
     </>
   );
 }
