@@ -20,22 +20,110 @@ function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }
 
-function formatDayShort(date: string): { dow: string; dm: string } {
-  const [y, m, d] = date.split("-").map(Number);
-  const dt = new Date(y, m - 1, d);
-  return {
-    dow: dt.toLocaleDateString([], { weekday: "short" }),
-    dm: dt.toLocaleDateString([], { month: "short", day: "numeric" }),
-  };
+function parseISODateLocal(s: string): Date {
+  const [y, m, d] = s.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+function toISODateLocal(d: Date): string {
+  const y = d.getFullYear();
+  const mo = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${mo}-${day}`;
+}
+
+function monthKey(d: Date): number {
+  return d.getFullYear() * 12 + d.getMonth();
 }
 
 function formatDateLabel(date: string): string {
-  const [y, m, d] = date.split("-").map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString([], {
+  return parseISODateLocal(date).toLocaleDateString(undefined, {
     weekday: "short",
     month: "short",
     day: "numeric",
   });
+}
+
+function BookMonthCalendar({
+  viewMonth,
+  onViewMonthChange,
+  availableSet,
+  selectedDate,
+  onSelectDate,
+  minMonthKey,
+  maxMonthKey,
+}: {
+  viewMonth: Date;
+  onViewMonthChange: (d: Date) => void;
+  availableSet: Set<string>;
+  selectedDate: string | null;
+  onSelectDate: (iso: string) => void;
+  minMonthKey: number;
+  maxMonthKey: number;
+}) {
+  const mk = monthKey(viewMonth);
+  const canPrev = mk > minMonthKey;
+  const canNext = mk < maxMonthKey;
+
+  const y = viewMonth.getFullYear();
+  const m = viewMonth.getMonth();
+  const firstDow = new Date(y, m, 1).getDay();
+  const pad = (firstDow + 6) % 7;
+  const lastDay = new Date(y, m + 1, 0).getDate();
+  const todayISO = toISODateLocal(new Date());
+
+  return (
+    <div className="book-cal">
+      <div className="book-cal-nav">
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm"
+          disabled={!canPrev}
+          onClick={() => onViewMonthChange(new Date(y, m - 1, 1))}
+          aria-label="Previous month"
+        >
+          ←
+        </button>
+        <strong>{viewMonth.toLocaleDateString(undefined, { month: "long", year: "numeric" })}</strong>
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm"
+          disabled={!canNext}
+          onClick={() => onViewMonthChange(new Date(y, m + 1, 1))}
+          aria-label="Next month"
+        >
+          →
+        </button>
+      </div>
+      <div className="book-cal-dows" aria-hidden="true">
+        {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
+          <span key={d}>{d}</span>
+        ))}
+      </div>
+      <div className="book-cal-grid">
+        {Array.from({ length: pad }, (_, i) => (
+          <div key={`pad-${i}`} className="book-cal-empty" />
+        ))}
+        {Array.from({ length: lastDay }, (_, i) => i + 1).map((day) => {
+          const iso = toISODateLocal(new Date(y, m, day));
+          const available = availableSet.has(iso);
+          const selected = selectedDate === iso;
+          const today = iso === todayISO;
+          return (
+            <button
+              key={iso}
+              type="button"
+              disabled={!available}
+              className={`book-cal-day${available ? " available" : ""}${selected ? " selected" : ""}${today ? " today" : ""}`}
+              onClick={() => onSelectDate(iso)}
+            >
+              {day}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 function slotMinutes(slot: Slot) {
@@ -91,6 +179,38 @@ export default function BookPage() {
     () => selectedDay?.slots.filter((s) => s.available) ?? [],
     [selectedDay],
   );
+
+  const sortedAvailableDays = useMemo(
+    () => [...availableDays].sort((a, b) => a.date.localeCompare(b.date)),
+    [availableDays],
+  );
+  const availableSet = useMemo(
+    () => new Set(sortedAvailableDays.map((d) => d.date)),
+    [sortedAvailableDays],
+  );
+  const monthBounds = useMemo(() => {
+    if (!sortedAvailableDays.length) return { min: 0, max: 0 };
+    const a = parseISODateLocal(sortedAvailableDays[0].date);
+    const b = parseISODateLocal(sortedAvailableDays[sortedAvailableDays.length - 1].date);
+    return { min: monthKey(a), max: monthKey(b) };
+  }, [sortedAvailableDays]);
+
+  const [viewMonth, setViewMonth] = useState(() => new Date());
+
+  useEffect(() => {
+    if (!sortedAvailableDays.length) return;
+    const first = parseISODateLocal(sortedAvailableDays[0].date);
+    setViewMonth(new Date(first.getFullYear(), first.getMonth(), 1));
+  }, [sortedAvailableDays]);
+
+  useEffect(() => {
+    if (!selectedDate) return;
+    const d = parseISODateLocal(selectedDate);
+    setViewMonth((prev) => {
+      if (prev.getFullYear() === d.getFullYear() && prev.getMonth() === d.getMonth()) return prev;
+      return new Date(d.getFullYear(), d.getMonth(), 1);
+    });
+  }, [selectedDate]);
 
   const selectedServiceLabel = SERVICE_OPTIONS.find((s) => s.value === serviceType)?.label;
   const selectedDateLabel = selectedDate ? formatDateLabel(selectedDate) : undefined;
@@ -313,70 +433,68 @@ export default function BookPage() {
 
                 {loadingSlots ? (
                   <p className="text-muted">Loading availability…</p>
-                ) : availableDays.length === 0 ? (
+                ) : sortedAvailableDays.length === 0 ? (
                   <Alert variant="warning">
                     No availability in the next 30 days. Please check back soon or reach out
                     and we&apos;ll see what we can do.
                   </Alert>
                 ) : (
                   <>
-                    <div className="day-chips" role="radiogroup" aria-label="Pick a date">
-                      {availableDays.map((d) => {
-                        const labels = formatDayShort(d.date);
-                        return (
-                          <button
-                            key={d.date}
-                            type="button"
-                            role="radio"
-                            aria-checked={selectedDate === d.date}
-                            className={`chip chip-stack${selectedDate === d.date ? " selected" : ""}`}
-                            onClick={() => {
-                              setSelectedDate(d.date);
-                              setSelectedSlot(null);
-                            }}
-                          >
-                            <span className="chip-top">{labels.dow}</span>
-                            <span>{labels.dm}</span>
-                          </button>
-                        );
-                      })}
+                    <div style={{ marginBottom: 20 }}>
+                      <span className="helper-text" style={{ display: "block", marginBottom: 10 }}>
+                        Select a date
+                      </span>
+                      <BookMonthCalendar
+                        viewMonth={viewMonth}
+                        onViewMonthChange={setViewMonth}
+                        availableSet={availableSet}
+                        selectedDate={selectedDate}
+                        onSelectDate={(iso) => {
+                          setSelectedDate(iso);
+                          setSelectedSlot(null);
+                        }}
+                        minMonthKey={monthBounds.min}
+                        maxMonthKey={monthBounds.max}
+                      />
                     </div>
 
-                    <div style={{ marginTop: 18 }}>
-                      <label
-                        className="helper-text"
-                        style={{ marginBottom: 8, display: "block" }}
+                    <label>
+                      Time
+                      {selectedDate ? (
+                        <span className="helper-text" style={{ display: "block", fontWeight: 400, marginTop: 4 }}>
+                          {formatDateLabel(selectedDate)}
+                        </span>
+                      ) : null}
+                      <select
+                        className="input"
+                        style={{ marginTop: 8 }}
+                        aria-label="Pick a time"
+                        value={selectedSlot?.startAt ?? ""}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          if (!v) {
+                            setSelectedSlot(null);
+                            return;
+                          }
+                          const slot = availableTimeSlots.find((s) => s.startAt === v);
+                          setSelectedSlot(slot ?? null);
+                        }}
+                        disabled={!selectedDay || availableTimeSlots.length === 0}
                       >
-                        Times for {selectedDate ? formatDateLabel(selectedDate) : "the selected day"}
-                      </label>
-                      {!selectedDay ? (
-                        <p className="text-muted">Pick a date above.</p>
-                      ) : availableTimeSlots.length === 0 ? (
-                        <p className="text-muted">No open times on this date. Try another date.</p>
-                      ) : (
-                        <div className="time-grid" role="radiogroup" aria-label="Pick a time">
-                          {availableTimeSlots.map((slot) => {
-                            const minutes = slotMinutes(slot);
-                            const sel = selectedSlot?.startAt === slot.startAt;
-                            return (
-                              <button
-                                key={slot.startAt}
-                                type="button"
-                                role="radio"
-                                aria-checked={sel}
-                                className={`chip chip-stack${sel ? " selected" : ""}`}
-                                onClick={() => setSelectedSlot(slot)}
-                              >
-                                <span className="chip-top">{minutes} min</span>
-                                <span>
-                                  {formatTime(slot.startAt)} – {formatTime(slot.endAt)}
-                                </span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
+                        <option value="">
+                          {!selectedDay
+                            ? "Pick a date on the calendar first…"
+                            : availableTimeSlots.length === 0
+                              ? "No open times this day"
+                              : "Select a time…"}
+                        </option>
+                        {availableTimeSlots.map((slot) => (
+                          <option key={slot.startAt} value={slot.startAt}>
+                            {formatTime(slot.startAt)} – {formatTime(slot.endAt)} ({slotMinutes(slot)} min)
+                          </option>
+                        ))}
+                      </select>
+                    </label>
                   </>
                 )}
               </fieldset>

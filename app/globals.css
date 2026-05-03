@@ -52,8 +52,8 @@
   --shadow-focus: 0 0 0 3px rgba(37, 99, 235, 0.25);
 
   /* Type */
-  --font-sans: var(--font-geist-sans), -apple-system, BlinkMacSystemFont,
-    "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-sans: var(--font-montserrat), -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, Helvetica, Arial, sans-serif;
 }
 
 * {
@@ -1050,21 +1050,6 @@ small { color: var(--color-muted); font-size: 13px; }
 }
 .chip.selected .chip-top { color: var(--color-primary-hover); }
 
-.day-chips {
-  display: flex;
-  gap: 10px;
-  overflow-x: auto;
-  padding-bottom: 4px;
-  margin: 0 -4px;
-}
-.day-chips > .chip { flex-shrink: 0; }
-
-.time-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 10px;
-}
-
 /* ====================== SEGMENTED CONTROL ====================== */
 
 .segmented {
@@ -1347,6 +1332,86 @@ tr:last-child td { border-bottom: none; }
   font-size: 14px;
 }
 .job-meta .label { color: var(--color-muted); }
+
+/* ====================== BOOKING CALENDAR (/book) ====================== */
+
+.book-cal {
+  max-width: 360px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  padding: 14px 14px 16px;
+  box-shadow: var(--shadow-xs);
+}
+.book-cal-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.book-cal-nav strong {
+  font-size: 15px;
+  font-weight: 700;
+}
+.book-cal-nav button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.book-cal-dows {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.book-cal-dows span {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.book-cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+.book-cal-empty {
+  min-height: 40px;
+}
+.book-cal-day {
+  min-height: 40px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-subtle);
+  cursor: default;
+}
+.book-cal-day.available {
+  color: var(--color-text);
+  border-color: var(--color-border);
+  background: var(--color-surface-2);
+  cursor: pointer;
+}
+.book-cal-day.available:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+.book-cal-day.selected {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: #fff;
+}
+.book-cal-day.today:not(.selected) {
+  box-shadow: inset 0 0 0 2px var(--color-primary);
+}
+.book-cal-day:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
 
 /* ====================== RESPONSIVE ====================== */
 

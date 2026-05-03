@@ -41,7 +41,7 @@
   background: var(--admin-bg);
   color: var(--admin-text);
   min-height: 100vh;
-  font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI",
+  font-family: var(--font-montserrat), -apple-system, BlinkMacSystemFont, "Segoe UI",
     Roboto, Helvetica, Arial, sans-serif;
 }
 
