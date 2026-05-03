@@ -72,6 +72,11 @@ export default function BookPage() {
     [days, selectedDate],
   );
 
+  const availableTimeSlots = useMemo(
+    () => selectedDay?.slots.filter((s) => s.available) ?? [],
+    [selectedDay],
+  );
+
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
@@ -130,6 +135,7 @@ export default function BookPage() {
 
       setSuccess(true);
       setSelectedSlot(null);
+      setSelectedDate(null);
       form.reset();
       setServiceType("");
     } catch {
@@ -147,13 +153,13 @@ export default function BookPage() {
             <span className="hero-badge">Booking</span>
             <h1 style={{ fontSize: 44, marginBottom: 10 }}>Book an Appointment</h1>
             <p className="section-subtitle">
-              Pick a service, choose a time that works, and we will confirm by email.
+              Pick a service, choose a time that works, and we&apos;ll confirm by email.
             </p>
             <div className="card">
               <h3 style={{ marginBottom: 10 }}>What happens next</h3>
               <ol style={{ display: "grid", gap: 10, color: "var(--color-muted)" }}>
-                <li>You receive an instant booking confirmation email.</li>
-                <li>We review and confirm your appointment.</li>
+                <li>You receive an instant request-received email.</li>
+                <li>We review your request and send a confirmation email once it&apos;s approved.</li>
                 <li>We arrive on time and ready to take care of your space.</li>
               </ol>
             </div>
@@ -162,7 +168,7 @@ export default function BookPage() {
           <div>
             {success && (
               <p style={{ color: "limegreen", marginBottom: 12 }}>
-                Booking submitted successfully. Check your email for confirmation.
+                Request submitted. Check your email for the receipt — we&apos;ll send a separate confirmation once we approve it.
               </p>
             )}
 
@@ -180,7 +186,10 @@ export default function BookPage() {
                 <select
                   className="input"
                   value={serviceType}
-                  onChange={(e) => setServiceType(e.target.value)}
+                  onChange={(e) => {
+                    setServiceType(e.target.value);
+                    setSuccess(false);
+                  }}
                   required
                 >
                   <option value="">Select a service...</option>
@@ -190,80 +199,80 @@ export default function BookPage() {
                 </select>
               </label>
 
-              <div>
-                <label style={{ display: "block", marginBottom: 8 }}>
-                  Choose a date *
+              <div className="grid grid-2">
+                <label>
+                  Date *
+                  <select
+                    className="input"
+                    value={selectedDate ?? ""}
+                    onChange={(e) => {
+                      setSelectedDate(e.target.value || null);
+                      setSelectedSlot(null);
+                      setSuccess(false);
+                    }}
+                    disabled={loadingSlots || availableDays.length === 0}
+                    required
+                  >
+                    <option value="" disabled>
+                      {loadingSlots
+                        ? "Loading..."
+                        : availableDays.length === 0
+                          ? "No availability"
+                          : "Choose a date..."}
+                    </option>
+                    {availableDays.map((d) => (
+                      <option key={d.date} value={d.date}>
+                        {formatDateLabel(d.date)}
+                      </option>
+                    ))}
+                  </select>
                 </label>
-                {loadingSlots ? (
-                  <p style={{ color: "var(--color-muted)" }}>Loading availability...</p>
-                ) : availableDays.length === 0 ? (
-                  <p style={{ color: "var(--color-muted)" }}>No availability in the next 30 days. Please check back soon.</p>
-                ) : (
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    {availableDays.map((d) => {
-                      const isSelected = d.date === selectedDate;
-                      return (
-                        <button
-                          key={d.date}
-                          type="button"
-                          onClick={() => {
-                            setSelectedDate(d.date);
-                            setSelectedSlot(null);
-                          }}
-                          style={{
-                            padding: "8px 12px",
-                            borderRadius: 8,
-                            border: `1px solid ${isSelected ? "var(--color-primary)" : "var(--color-border)"}`,
-                            background: isSelected ? "rgba(37,99,235,0.15)" : "transparent",
-                            color: "var(--color-text)",
-                            cursor: "pointer",
-                            fontSize: 13,
-                          }}
-                        >
-                          {formatDateLabel(d.date)}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
 
-              {selectedDay && (
-                <div>
-                  <label style={{ display: "block", marginBottom: 8 }}>
-                    Available time slots *
-                  </label>
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    {selectedDay.slots.map((slot) => {
-                      const isSelected =
-                        selectedSlot?.startAt === slot.startAt;
+                <label>
+                  Time *
+                  <select
+                    className="input"
+                    value={selectedSlot?.startAt ?? ""}
+                    onChange={(e) => {
+                      const found = selectedDay?.slots.find((s) => s.startAt === e.target.value) ?? null;
+                      setSelectedSlot(found);
+                      setSuccess(false);
+                    }}
+                    disabled={!selectedDay || availableTimeSlots.length === 0}
+                    required
+                  >
+                    <option value="" disabled>
+                      {!selectedDay
+                        ? "Pick a date first"
+                        : availableTimeSlots.length === 0
+                          ? "No open times"
+                          : "Choose a time..."}
+                    </option>
+                    {availableTimeSlots.map((slot) => {
+                      const minutes = Math.round(
+                        (new Date(slot.endAt).getTime() - new Date(slot.startAt).getTime()) / 60000,
+                      );
                       return (
-                        <button
-                          key={slot.startAt}
-                          type="button"
-                          disabled={!slot.available}
-                          onClick={() => setSelectedSlot(slot)}
-                          style={{
-                            padding: "8px 12px",
-                            borderRadius: 8,
-                            border: `1px solid ${isSelected ? "var(--color-primary)" : "var(--color-border)"}`,
-                            background: isSelected
-                              ? "rgba(37,99,235,0.15)"
-                              : slot.available
-                                ? "transparent"
-                                : "rgba(255,255,255,0.04)",
-                            color: slot.available ? "var(--color-text)" : "var(--color-muted)",
-                            cursor: slot.available ? "pointer" : "not-allowed",
-                            opacity: slot.available ? 1 : 0.5,
-                            fontSize: 13,
-                          }}
-                        >
-                          {formatTime(slot.startAt)}
-                        </button>
+                        <option key={slot.startAt} value={slot.startAt}>
+                          {formatTime(slot.startAt)} - {formatTime(slot.endAt)} ({minutes} min)
+                        </option>
                       );
                     })}
-                  </div>
-                </div>
+                  </select>
+                </label>
+              </div>
+              {loadingSlots && (
+                <small style={{ color: "var(--color-muted)" }}>Loading availability...</small>
+              )}
+              {!loadingSlots && availableDays.length === 0 && (
+                <small style={{ color: "var(--color-muted)" }}>
+                  No availability in the next 30 days. Please check back soon.
+                </small>
+              )}
+              {!loadingSlots && selectedDay && availableTimeSlots.length === 0 && (
+                <small style={{ color: "var(--color-muted)" }}>
+                  No open times on this date. Try another date.
+                </small>
               )}
 
               <div className="grid grid-2">
