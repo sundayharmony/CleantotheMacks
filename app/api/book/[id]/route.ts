@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { notifyBookingCanceled } from "@/lib/email";
+import {
+  notifyBookingCanceled,
+  notifyBookingConfirmed,
+  notifyBookingRescheduled,
+} from "@/lib/email";
 
 export const runtime = "nodejs"; // ensure Prisma runs in Node (not Edge)
 
@@ -65,6 +69,7 @@ export async function PATCH(req: Request, context: any) {
       clientId?: string | null;
       scheduledDate?: string | null;
       serviceType?: string | null;
+      cancellationReason?: string | null;
     };
     const id = bookingIdFromRequest(req, routeParams, body);
 
@@ -140,7 +145,14 @@ export async function PATCH(req: Request, context: any) {
 
     const existing = await prisma.booking.findUnique({
       where: { id },
-      select: { status: true, name: true, email: true, scheduledDate: true },
+      select: {
+        status: true,
+        name: true,
+        email: true,
+        address: true,
+        scheduledDate: true,
+        serviceType: true,
+      },
     });
 
     if (!existing) {
@@ -152,13 +164,51 @@ export async function PATCH(req: Request, context: any) {
       data,
     });
 
-    if (data.status === "CANCELED" && existing.status !== "CANCELED") {
+    /* Decide which client emails to send based on transitions */
+    const becameCanceled =
+      data.status === "CANCELED" && existing.status !== "CANCELED";
+    const becameConfirmed =
+      data.status === "CONFIRMED" && existing.status !== "CONFIRMED" && !becameCanceled;
+
+    const oldDateMs = existing.scheduledDate?.getTime() ?? null;
+    const newDateMs =
+      data.scheduledDate === undefined
+        ? oldDateMs
+        : data.scheduledDate?.getTime() ?? null;
+    const dateChanged =
+      data.scheduledDate !== undefined && oldDateMs !== newDateMs;
+
+    if (becameCanceled) {
       notifyBookingCanceled({
         clientName: existing.name,
         clientEmail: existing.email,
         scheduledDate: existing.scheduledDate
           ? existing.scheduledDate.toLocaleString()
           : null,
+        reason: body.cancellationReason?.trim() || null,
+      }).catch(() => {});
+    } else if (becameConfirmed) {
+      const dateForEmail = updated.scheduledDate ?? existing.scheduledDate ?? null;
+      if (dateForEmail) {
+        notifyBookingConfirmed({
+          clientName: existing.name,
+          clientEmail: existing.email,
+          scheduledDate: dateForEmail.toLocaleString(),
+          address: updated.address ?? existing.address,
+          serviceType: updated.serviceType ?? existing.serviceType ?? null,
+        }).catch(() => {});
+      }
+      /* If the same save also moved the date, the confirmation email above already
+         covers it — skip the reschedule email to avoid double-notifying. */
+    } else if (dateChanged && updated.status !== "CANCELED" && newDateMs) {
+      notifyBookingRescheduled({
+        clientName: existing.name,
+        clientEmail: existing.email,
+        oldScheduledDate: existing.scheduledDate
+          ? existing.scheduledDate.toLocaleString()
+          : null,
+        newScheduledDate: new Date(newDateMs).toLocaleString(),
+        address: updated.address ?? existing.address,
       }).catch(() => {});
     }
 

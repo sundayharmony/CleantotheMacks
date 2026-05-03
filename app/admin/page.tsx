@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, type CSSProperties } from "react";
 
 /* ─── Shared Types ─── */
 
@@ -238,6 +238,18 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
+  /* Cross-tab UI state. Lifted up so a Recent-Bookings click on Dashboard
+     can open the same modal that Bookings + Schedule use. */
+  const [openBookingId, setOpenBookingId] = useState<string | null>(null);
+  const [bookingsInitialFilter, setBookingsInitialFilter] = useState<"ALL" | BookingStatus>("ALL");
+
+  function jumpToBookingsFiltered(filter: "ALL" | BookingStatus) {
+    setBookingsInitialFilter(filter);
+    setTab("bookings");
+  }
+
+  const openBooking = bookings.find((b) => b.id === openBookingId) ?? null;
+
   const loadAll = useCallback(async () => {
     setLoading(true);
     setErr(null);
@@ -333,9 +345,9 @@ export default function AdminPage() {
           <p style={{ color: "tomato" }}>{err}</p>
         ) : (
           <>
-            {tab === "dashboard" && <DashboardTab bookings={bookings} clients={clients} jobs={jobs} testimonials={testimonials} setTab={setTab} />}
-            {tab === "bookings" && <BookingsTab bookings={bookings} setBookings={setBookings} cleaners={cleaners} clients={clients} reload={loadAll} />}
-            {tab === "schedule" && <ScheduleTab bookings={bookings} reload={loadAll} setTab={setTab} />}
+            {tab === "dashboard" && <DashboardTab bookings={bookings} clients={clients} jobs={jobs} testimonials={testimonials} setTab={setTab} jumpToBookingsFiltered={jumpToBookingsFiltered} onOpenBooking={setOpenBookingId} />}
+            {tab === "bookings" && <BookingsTab bookings={bookings} cleaners={cleaners} onOpenBooking={setOpenBookingId} initialFilter={bookingsInitialFilter} clearInitialFilter={() => setBookingsInitialFilter("ALL")} />}
+            {tab === "schedule" && <ScheduleTab bookings={bookings} cleaners={cleaners} reload={loadAll} setTab={setTab} onOpenBooking={setOpenBookingId} />}
             {tab === "clients" && <ClientsTab clients={clients} setClients={setClients} reload={loadAll} />}
             {tab === "cleaners" && <CleanersTab cleaners={cleaners} setCleaners={setCleaners} reload={loadAll} />}
             {tab === "jobs" && <JobsTab jobs={jobs} setJobs={setJobs} bookings={bookings} cleaners={cleaners} reload={loadAll} />}
@@ -345,7 +357,261 @@ export default function AdminPage() {
           </>
         )}
       </div>
+
+      <BookingDetailModal
+        booking={openBooking}
+        clients={clients}
+        cleaners={cleaners}
+        onClose={() => setOpenBookingId(null)}
+        onSaved={loadAll}
+        onDeleted={(id) => setBookings((prev) => prev.filter((r) => r.id !== id))}
+      />
     </section>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════
+   SHARED BOOKING DETAIL MODAL
+   ════════════════════════════════════════════════════════════════ */
+
+function BookingDetailModal({
+  booking,
+  clients,
+  cleaners,
+  onClose,
+  onSaved,
+  onDeleted,
+}: {
+  booking: Booking | null;
+  clients: Client[];
+  cleaners: Cleaner[];
+  onClose: () => void;
+  onSaved: () => Promise<void>;
+  onDeleted: (id: string) => void;
+}) {
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+  const [sendingRelease, setSendingRelease] = useState(false);
+
+  useEffect(() => {
+    if (!booking) return;
+    setDraft({
+      name: booking.name,
+      email: booking.email,
+      phone: booking.phone ?? "",
+      address: booking.address,
+      homeSize: booking.homeSize,
+      sqft: booking.sqft ?? "",
+      notes: booking.notes ?? "",
+      status: booking.status,
+      clientId: booking.clientId ?? "",
+      serviceType: booking.serviceType ?? "",
+      scheduledDate: toDatetimeLocalValue(booking.scheduledDate),
+      cancellationReason: "",
+    });
+  }, [booking]);
+
+  function updateStatus(nextStatus: string) {
+    setDraft((prev) => ({
+      ...prev,
+      status: nextStatus,
+      cancellationReason: nextStatus === "CANCELED" ? prev.cancellationReason ?? "" : "",
+    }));
+  }
+
+  function close() {
+    if (!saving) onClose();
+  }
+
+  async function save() {
+    if (!booking) return;
+    setSaving(true);
+    try {
+      const scheduledDatePatch =
+        draft.scheduledDate?.trim() ? new Date(draft.scheduledDate).toISOString() : null;
+      const res = await fetch(`/api/book/${booking.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: booking.id,
+          name: draft.name,
+          email: draft.email,
+          phone: draft.phone,
+          address: draft.address,
+          homeSize: draft.homeSize,
+          sqft: draft.sqft,
+          notes: draft.notes,
+          status: draft.status,
+          clientId: draft.clientId?.trim() ? draft.clientId : null,
+          serviceType: draft.serviceType?.trim() || null,
+          scheduledDate: scheduledDatePatch,
+          cancellationReason:
+            draft.status === "CANCELED" && draft.cancellationReason?.trim()
+              ? draft.cancellationReason.trim()
+              : null,
+        }),
+      });
+      if (!res.ok) {
+        const errData = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(errData?.error || `Save failed (${res.status})`);
+      }
+      await onSaved();
+      onClose();
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : "Save failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function deleteBooking() {
+    if (!booking || !window.confirm(`Delete booking for ${booking.name}?`)) return;
+    try {
+      await fetch(`/api/book/${booking.id}`, { method: "DELETE" });
+      onDeleted(booking.id);
+      onClose();
+    } catch {
+      alert("Delete failed");
+    }
+  }
+
+  async function assignCleaner(bookingId: string, cleanerId: string) {
+    try {
+      const res = await fetch("/api/job", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bookingId, cleanerId }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => null);
+        throw new Error(d?.error || "Assign failed");
+      }
+      await onSaved();
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : "Assign failed");
+    }
+  }
+
+  async function sendVideoRelease(b: Booking) {
+    setSendingRelease(true);
+    try {
+      const res = await fetch("/api/video-release/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clientName: b.name,
+          clientEmail: b.email,
+          propertyAddress: b.address,
+          bookingId: b.id,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || "Failed to send video release form");
+      }
+      alert(`Video release sent to ${b.email}`);
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : "Failed to send video release form");
+    } finally {
+      setSendingRelease(false);
+    }
+  }
+
+  return (
+    <Modal open={!!booking} onClose={close}>
+      {booking && (
+        <>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", gap: 16 }}>
+            <div>
+              <h2 style={{ margin: 0, fontSize: 24 }}>Booking Details</h2>
+              <p style={{ marginTop: 4, opacity: 0.75, fontSize: 14 }}>Created: {fmt(booking.createdAt)}</p>
+            </div>
+            <button className="btn btn-outline" onClick={close} style={{ padding: "6px 14px", fontSize: 13 }}>Close</button>
+          </div>
+
+          <div className="grid grid-2">
+            <label>Name<input className="input" value={draft.name ?? ""} onChange={(e) => setDraft({ ...draft, name: e.target.value })} /></label>
+            <label>Email<input className="input" type="email" value={draft.email ?? ""} onChange={(e) => setDraft({ ...draft, email: e.target.value })} /></label>
+            <label>Phone<input className="input" value={draft.phone ?? ""} onChange={(e) => setDraft({ ...draft, phone: e.target.value })} /></label>
+            <label>Bedrooms<input className="input" value={draft.homeSize ?? ""} onChange={(e) => setDraft({ ...draft, homeSize: e.target.value })} /></label>
+            <label>Sq Ft<input className="input" value={draft.sqft ?? ""} onChange={(e) => setDraft({ ...draft, sqft: e.target.value })} /></label>
+            <label>Status
+              <select className="input" value={draft.status ?? "NEW"} onChange={(e) => updateStatus(e.target.value)}>
+                <option value="NEW">NEW</option><option value="CONFIRMED">CONFIRMED</option><option value="COMPLETED">COMPLETED</option><option value="CANCELED">CANCELED</option>
+              </select>
+            </label>
+            <label>Link Client
+              <select className="input" value={draft.clientId ?? ""} onChange={(e) => setDraft({ ...draft, clientId: e.target.value })}>
+                <option value="">None</option>
+                {clients.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.email})</option>)}
+              </select>
+            </label>
+            <label>Service Type
+              <select className="input" value={draft.serviceType ?? ""} onChange={(e) => setDraft({ ...draft, serviceType: e.target.value })}>
+                <option value="">—</option>
+                <option value="standard">Standard Cleaning</option>
+                <option value="deep_clean">Deep Clean</option>
+                <option value="move_in">Move-In/Out</option>
+                <option value="recurring">Recurring</option>
+                <option value="painting">Interior Painting</option>
+              </select>
+            </label>
+          </div>
+          <label>
+            Appointment date &amp; time (optional)
+            <input
+              type="datetime-local"
+              className="input"
+              value={draft.scheduledDate ?? ""}
+              onChange={(e) => setDraft({ ...draft, scheduledDate: e.target.value })}
+            />
+            <small style={{ display: "block", marginTop: 6, opacity: 0.75, fontSize: 12 }}>
+              Fills the Schedule calendar and list. Requests submitted before scheduling launched have no date—set one here, or leave blank.
+            </small>
+          </label>
+          <label>Address<input className="input" value={draft.address ?? ""} onChange={(e) => setDraft({ ...draft, address: e.target.value })} /></label>
+          <label>Notes<textarea className="input" rows={3} value={draft.notes ?? ""} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} /></label>
+
+          {draft.status === "CANCELED" && (
+            <label>
+              Reason for cancellation (optional, sent to customer)
+              <textarea
+                className="input"
+                rows={2}
+                placeholder="e.g. We had to reschedule due to a conflict."
+                value={draft.cancellationReason ?? ""}
+                onChange={(e) => setDraft({ ...draft, cancellationReason: e.target.value })}
+              />
+            </label>
+          )}
+
+          {!booking.cleaningJob && (
+            <div style={{ borderTop: "1px solid var(--color-border)", paddingTop: 14 }}>
+              <label>Assign Cleaner
+                <select className="input" defaultValue="" onChange={(e) => { if (e.target.value) assignCleaner(booking.id, e.target.value); }}>
+                  <option value="" disabled>Select a cleaner…</option>
+                  {cleaners.map((c) => <option key={c.id} value={c.id}>{c.name} — {c.paymentType === "hourly" ? `$${c.hourlyRate}/hr` : "Per job"}</option>)}
+                </select>
+              </label>
+            </div>
+          )}
+
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+            <button className="btn btn-outline" onClick={deleteBooking} disabled={saving} style={{ borderColor: "rgba(239,68,68,0.5)", color: "#fca5a5" }}>Delete Booking</button>
+            <div style={{ display: "flex", gap: 10, marginLeft: "auto", flexWrap: "wrap" }}>
+              <button
+                className="btn btn-outline"
+                onClick={() => sendVideoRelease(booking)}
+                disabled={sendingRelease}
+              >
+                {sendingRelease ? "Sending..." : "Send Video Release"}
+              </button>
+              <button className="btn btn-primary" onClick={save} disabled={saving}>{saving ? "Saving…" : "Save Changes"}</button>
+            </div>
+          </div>
+        </>
+      )}
+    </Modal>
   );
 }
 
@@ -353,18 +619,27 @@ export default function AdminPage() {
    BOOKINGS TAB
    ════════════════════════════════════════════════════════════════ */
 
-function BookingsTab({ bookings, setBookings, cleaners, clients, reload }: {
+function BookingsTab({ bookings, cleaners, onOpenBooking, initialFilter, clearInitialFilter }: {
   bookings: Booking[];
-  setBookings: React.Dispatch<React.SetStateAction<Booking[]>>;
   cleaners: Cleaner[];
-  clients: Client[];
-  reload: () => Promise<void>;
+  onOpenBooking: (id: string) => void;
+  initialFilter: "ALL" | BookingStatus;
+  clearInitialFilter: () => void;
 }) {
-  const [filter, setFilter] = useState<"ALL" | BookingStatus>("ALL");
+  const [filter, setFilter] = useState<"ALL" | BookingStatus>(initialFilter);
   const [q, setQ] = useState("");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
   const [sendingRelease, setSendingRelease] = useState(false);
+
+  /* When AdminPage navigated us here with a pre-set filter (e.g. from Dashboard's
+     "New / Pending" tile), apply it once on mount and clear the parent flag so
+     that future visits to this tab don't re-override the user's manual choice. */
+  useEffect(() => {
+    if (initialFilter !== "ALL") {
+      setFilter(initialFilter);
+      clearInitialFilter();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const filtered = useMemo(() => {
     const query = q.trim().toLowerCase();
@@ -377,76 +652,6 @@ function BookingsTab({ bookings, setBookings, cleaners, clients, reload }: {
       })
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }, [bookings, filter, q]);
-
-  const selected = selectedId ? bookings.find((b) => b.id === selectedId) ?? null : null;
-
-  // Editable draft for modal
-  const [draft, setDraft] = useState<Record<string, string>>({});
-  function openBooking(b: Booking) {
-    setSelectedId(b.id);
-    setDraft({
-      name: b.name, email: b.email, phone: b.phone ?? "", address: b.address,
-      homeSize: b.homeSize, sqft: b.sqft ?? "", notes: b.notes ?? "",
-      status: b.status, clientId: b.clientId ?? "", serviceType: b.serviceType ?? "",
-      scheduledDate: toDatetimeLocalValue(b.scheduledDate),
-    });
-  }
-  function close() { if (!saving) { setSelectedId(null); } }
-
-  async function save() {
-    if (!selected) return;
-    setSaving(true);
-    try {
-      const scheduledDatePatch =
-        draft.scheduledDate?.trim() ? new Date(draft.scheduledDate).toISOString() : null;
-      const res = await fetch(`/api/book/${selected.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: selected.id,
-          name: draft.name,
-          email: draft.email,
-          phone: draft.phone,
-          address: draft.address,
-          homeSize: draft.homeSize,
-          sqft: draft.sqft,
-          notes: draft.notes,
-          status: draft.status,
-          clientId: draft.clientId?.trim() ? draft.clientId : null,
-          serviceType: draft.serviceType?.trim() || null,
-          scheduledDate: scheduledDatePatch,
-        }),
-      });
-      if (!res.ok) {
-        const errData = (await res.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(errData?.error || `Save failed (${res.status})`);
-      }
-      await reload();
-      setSelectedId(null);
-    } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : "Save failed");
-    } finally { setSaving(false); }
-  }
-
-  async function deleteBooking() {
-    if (!selected || !window.confirm(`Delete booking for ${selected.name}?`)) return;
-    try {
-      await fetch(`/api/book/${selected.id}`, { method: "DELETE" });
-      setBookings((prev) => prev.filter((r) => r.id !== selected.id));
-      setSelectedId(null);
-    } catch { alert("Delete failed"); }
-  }
-
-  async function assignCleaner(bookingId: string, cleanerId: string) {
-    try {
-      const res = await fetch("/api/job", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bookingId, cleanerId }),
-      });
-      if (!res.ok) { const d = await res.json().catch(() => null); throw new Error(d?.error || "Assign failed"); }
-      await reload();
-    } catch (e: unknown) { alert(e instanceof Error ? e.message : "Assign failed"); }
-  }
 
   async function sendVideoRelease(booking: Booking) {
     setSendingRelease(true);
@@ -502,7 +707,7 @@ function BookingsTab({ bookings, setBookings, cleaners, clients, reload }: {
               {filtered.map((b) => {
                 const assignedCleaner = b.cleaningJob ? cleaners.find((c) => c.id === b.cleaningJob?.cleanerId)?.name : null;
                 return (
-                  <tr key={b.id} style={{ cursor: "pointer" }} onClick={() => openBooking(b)}>
+                  <tr key={b.id} style={{ cursor: "pointer" }} onClick={() => onOpenBooking(b.id)}>
                     <td style={{ whiteSpace: "nowrap" }}>{fmtDate(b.createdAt)}</td>
                     <td style={{ whiteSpace: "nowrap", fontSize: 13 }}>
                       {b.scheduledDate ? fmt(b.scheduledDate) : <span style={{ opacity: 0.5 }}>—</span>}
@@ -550,88 +755,6 @@ function BookingsTab({ bookings, setBookings, cleaners, clients, reload }: {
         </div>
       )}
 
-      <Modal open={!!selected} onClose={close}>
-        {selected && (
-          <>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", gap: 16 }}>
-              <div>
-                <h2 style={{ margin: 0, fontSize: 24 }}>Booking Details</h2>
-                <p style={{ marginTop: 4, opacity: 0.75, fontSize: 14 }}>Created: {fmt(selected.createdAt)}</p>
-              </div>
-              <button className="btn btn-outline" onClick={close} style={{ padding: "6px 14px", fontSize: 13 }}>Close</button>
-            </div>
-
-            <div className="grid grid-2">
-              <label>Name<input className="input" value={draft.name ?? ""} onChange={(e) => setDraft({ ...draft, name: e.target.value })} /></label>
-              <label>Email<input className="input" type="email" value={draft.email ?? ""} onChange={(e) => setDraft({ ...draft, email: e.target.value })} /></label>
-              <label>Phone<input className="input" value={draft.phone ?? ""} onChange={(e) => setDraft({ ...draft, phone: e.target.value })} /></label>
-              <label>Bedrooms<input className="input" value={draft.homeSize ?? ""} onChange={(e) => setDraft({ ...draft, homeSize: e.target.value })} /></label>
-              <label>Sq Ft<input className="input" value={draft.sqft ?? ""} onChange={(e) => setDraft({ ...draft, sqft: e.target.value })} /></label>
-              <label>Status
-                <select className="input" value={draft.status ?? "NEW"} onChange={(e) => setDraft({ ...draft, status: e.target.value })}>
-                  <option value="NEW">NEW</option><option value="CONFIRMED">CONFIRMED</option><option value="COMPLETED">COMPLETED</option><option value="CANCELED">CANCELED</option>
-                </select>
-              </label>
-              <label>Link Client
-                <select className="input" value={draft.clientId ?? ""} onChange={(e) => setDraft({ ...draft, clientId: e.target.value })}>
-                  <option value="">None</option>
-                  {clients.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.email})</option>)}
-                </select>
-              </label>
-              <label>Service Type
-                <select className="input" value={draft.serviceType ?? ""} onChange={(e) => setDraft({ ...draft, serviceType: e.target.value })}>
-                  <option value="">—</option>
-                  <option value="standard">Standard Cleaning</option>
-                  <option value="deep_clean">Deep Clean</option>
-                  <option value="move_in">Move-In/Out</option>
-                  <option value="recurring">Recurring</option>
-                  <option value="painting">Interior Painting</option>
-                </select>
-              </label>
-            </div>
-            <label>
-              Appointment date &amp; time (optional)
-              <input
-                type="datetime-local"
-                className="input"
-                value={draft.scheduledDate ?? ""}
-                onChange={(e) => setDraft({ ...draft, scheduledDate: e.target.value })}
-              />
-              <small style={{ display: "block", marginTop: 6, opacity: 0.75, fontSize: 12 }}>
-                Fills the Schedule calendar and list. Requests submitted before scheduling launched have no date—set one here, or leave blank.
-              </small>
-            </label>
-            <label>Address<input className="input" value={draft.address ?? ""} onChange={(e) => setDraft({ ...draft, address: e.target.value })} /></label>
-            <label>Notes<textarea className="input" rows={3} value={draft.notes ?? ""} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} /></label>
-
-            {/* Assign cleaner */}
-            {!selected.cleaningJob && (
-              <div style={{ borderTop: "1px solid var(--color-border)", paddingTop: 14 }}>
-                <label>Assign Cleaner
-                  <select className="input" defaultValue="" onChange={(e) => { if (e.target.value) assignCleaner(selected.id, e.target.value); }}>
-                    <option value="" disabled>Select a cleaner…</option>
-                    {cleaners.map((c) => <option key={c.id} value={c.id}>{c.name} — {c.paymentType === "hourly" ? `$${c.hourlyRate}/hr` : "Per job"}</option>)}
-                  </select>
-                </label>
-              </div>
-            )}
-
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-              <button className="btn btn-outline" onClick={deleteBooking} disabled={saving} style={{ borderColor: "rgba(239,68,68,0.5)", color: "#fca5a5" }}>Delete Booking</button>
-              <div style={{ display: "flex", gap: 10, marginLeft: "auto", flexWrap: "wrap" }}>
-                <button
-                  className="btn btn-outline"
-                  onClick={() => sendVideoRelease(selected)}
-                  disabled={sendingRelease}
-                >
-                  {sendingRelease ? "Sending..." : "Send Video Release"}
-                </button>
-                <button className="btn btn-primary" onClick={save} disabled={saving}>{saving ? "Saving…" : "Save Changes"}</button>
-              </div>
-            </div>
-          </>
-        )}
-      </Modal>
     </>
   );
 }
@@ -1483,12 +1606,14 @@ function VideoReleasesTab({
    DASHBOARD TAB
    ════════════════════════════════════════════════════════════════ */
 
-function DashboardTab({ bookings, clients, jobs, testimonials, setTab }: {
+function DashboardTab({ bookings, clients, jobs, testimonials, setTab, jumpToBookingsFiltered, onOpenBooking }: {
   bookings: Booking[];
   clients: Client[];
   jobs: Job[];
   testimonials: Testimonial[];
   setTab: (t: Tab) => void;
+  jumpToBookingsFiltered: (filter: "ALL" | BookingStatus) => void;
+  onOpenBooking: (id: string) => void;
 }) {
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -1508,11 +1633,18 @@ function DashboardTab({ bookings, clients, jobs, testimonials, setTab }: {
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 8);
 
+  const clickableTileStyle: CSSProperties = {
+    cursor: "pointer",
+    border: "1px solid transparent",
+    transition: "border-color 0.15s",
+  };
+
   return (
     <>
       {/* Quick Actions */}
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20 }}>
         <button className="btn btn-primary" onClick={() => setTab("bookings")} style={{ padding: "10px 18px", fontSize: 14 }}>View Bookings</button>
+        <button className="btn btn-outline" onClick={() => setTab("schedule")} style={{ padding: "10px 18px", fontSize: 14 }}>Schedule</button>
         <button className="btn btn-outline" onClick={() => setTab("clients")} style={{ padding: "10px 18px", fontSize: 14 }}>Manage Clients</button>
         <button className="btn btn-outline" onClick={() => setTab("testimonials")} style={{ padding: "10px 18px", fontSize: 14 }}>Manage Testimonials</button>
       </div>
@@ -1520,7 +1652,15 @@ function DashboardTab({ bookings, clients, jobs, testimonials, setTab }: {
       {/* Stats Grid */}
       <div className="stat-row" style={{ marginBottom: 24 }}>
         <div className="stat-card"><strong>{bookingsThisMonth}</strong><small>Bookings This Month</small></div>
-        <div className="stat-card"><strong>{newBookings}</strong><small>New / Pending</small></div>
+        <button
+          type="button"
+          className="stat-card"
+          onClick={() => jumpToBookingsFiltered("NEW")}
+          style={clickableTileStyle}
+          title="Open Bookings filtered to NEW"
+        >
+          <strong>{newBookings}</strong><small>New / Pending</small>
+        </button>
         <div className="stat-card"><strong>{activeJobs}</strong><small>Active Jobs</small></div>
         <div className="stat-card"><strong>${revenueThisMonth.toFixed(2)}</strong><small>Revenue This Month</small></div>
         <div className="stat-card"><strong>{totalClients}</strong><small>Total Clients</small></div>
@@ -1535,7 +1675,26 @@ function DashboardTab({ bookings, clients, jobs, testimonials, setTab }: {
       ) : (
         <div style={{ display: "grid", gap: 8 }}>
           {recentBookings.map((b) => (
-            <div key={b.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: 12, fontSize: 14 }}>
+            <button
+              key={b.id}
+              type="button"
+              onClick={() => onOpenBooking(b.id)}
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                padding: "12px 16px",
+                background: "var(--color-surface)",
+                border: "1px solid var(--color-border)",
+                borderRadius: 12,
+                fontSize: 14,
+                width: "100%",
+                textAlign: "left",
+                color: "inherit",
+                font: "inherit",
+                cursor: "pointer",
+              }}
+            >
               <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
                 <span style={{ fontWeight: 600 }}>{b.name}</span>
                 <span style={{ color: "var(--color-muted)" }}>{b.address}</span>
@@ -1544,7 +1703,7 @@ function DashboardTab({ bookings, clients, jobs, testimonials, setTab }: {
                 <span style={{ color: "var(--color-muted)", fontSize: 13 }}>{fmtDate(b.createdAt)}</span>
                 <span style={pillStyle(b.status)}>{b.status}</span>
               </div>
-            </div>
+            </button>
           ))}
         </div>
       )}
@@ -1961,12 +2120,15 @@ function GalleryTab({ gallery, setGallery, reload }: {
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const DAY_LABELS_LONG = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
-function ScheduleTab({ bookings, reload, setTab }: {
+function ScheduleTab({ bookings, cleaners, reload, setTab, onOpenBooking }: {
   bookings: Booking[];
+  cleaners: Cleaner[];
   reload: () => Promise<void>;
   setTab: (t: Tab) => void;
+  onOpenBooking: (id: string) => void;
 }) {
   const [view, setView] = useState<"calendar" | "list" | "availability" | "blocked">("calendar");
+  const [openDayKey, setOpenDayKey] = useState<string | null>(null);
   const [monthCursor, setMonthCursor] = useState<Date>(() => {
     const d = new Date();
     return new Date(d.getFullYear(), d.getMonth(), 1);
@@ -1977,6 +2139,33 @@ function ScheduleTab({ bookings, reload, setTab }: {
   const [savingCfg, setSavingCfg] = useState(false);
   const [blockDraft, setBlockDraft] = useState({ startAt: "", endAt: "", reason: "" });
   const [busyBlock, setBusyBlock] = useState(false);
+
+  const pendingNoDate = useMemo(
+    () => bookings.filter((b) => b.status === "NEW" && !b.scheduledDate).length,
+    [bookings],
+  );
+
+  const ruleByDow = useMemo(() => {
+    const m = new Map<number, AvailabilityRule>();
+    for (const r of config) m.set(r.dayOfWeek, r);
+    return m;
+  }, [config]);
+
+  const blocksByDayKey = useMemo(() => {
+    const m = new Map<string, BlockedSlot[]>();
+    for (const b of blocked) {
+      const start = new Date(b.startAt);
+      const end = new Date(b.endAt);
+      const cursor = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+      while (cursor.getTime() < end.getTime()) {
+        const key = `${cursor.getFullYear()}-${cursor.getMonth()}-${cursor.getDate()}`;
+        if (!m.has(key)) m.set(key, []);
+        m.get(key)!.push(b);
+        cursor.setDate(cursor.getDate() + 1);
+      }
+    }
+    return m;
+  }, [blocked]);
 
   const loadScheduleData = useCallback(async () => {
     setLoadingCfg(true);
@@ -2043,11 +2232,6 @@ function ScheduleTab({ bookings, reload, setTab }: {
       .filter((b) => b.scheduledDate)
       .sort((a, b) => new Date(a.scheduledDate!).getTime() - new Date(b.scheduledDate!).getTime());
   }, [bookings]);
-
-  const legacyWithoutAppointmentTime = useMemo(
-    () => bookings.filter((b) => !b.scheduledDate).length,
-    [bookings],
-  );
 
   function shiftMonth(delta: number) {
     setMonthCursor(new Date(monthStart.getFullYear(), monthStart.getMonth() + delta, 1));
@@ -2142,44 +2326,34 @@ function ScheduleTab({ bookings, reload, setTab }: {
 
   return (
     <>
-      <div
-        className="card"
-        style={{
-          marginBottom: 16,
-          padding: "14px 16px",
-          borderLeft: "4px solid var(--color-primary)",
-          fontSize: 14,
-          lineHeight: 1.55,
-        }}
-      >
-        <strong style={{ display: "block", marginBottom: 6 }}>Where did my bookings go?</strong>
-        <span style={{ opacity: 0.9 }}>
-          Nothing was deleted. This &quot;Schedule&quot; area only shows appointments that have a{" "}
-          <strong>date and time</strong>. Older requests (or manual entries) without that still appear under{" "}
+      {pendingNoDate > 0 && (
+        <div
+          style={{
+            display: "flex",
+            gap: 12,
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "10px 14px",
+            marginBottom: 12,
+            borderRadius: 8,
+            background: "rgba(245, 158, 11, 0.10)",
+            border: "1px solid rgba(245, 158, 11, 0.35)",
+            fontSize: 13,
+          }}
+        >
+          <span>
+            <strong>{pendingNoDate}</strong> pending request{pendingNoDate === 1 ? "" : "s"} need{pendingNoDate === 1 ? "s" : ""} a date — these don&apos;t appear on the calendar yet.
+          </span>
           <button
             type="button"
             onClick={() => setTab("bookings")}
-            style={{
-              background: "none",
-              border: "none",
-              padding: 0,
-              color: "var(--color-secondary)",
-              textDecoration: "underline",
-              cursor: "pointer",
-              font: "inherit",
-            }}
+            className="btn btn-outline"
+            style={{ padding: "4px 12px", fontSize: 13 }}
           >
-            Bookings
+            Open Bookings
           </button>
-          . Open a booking there and set &quot;Appointment date &amp; time&quot; if you want it on this calendar.
-        </span>
-        {legacyWithoutAppointmentTime > 0 && (
-          <p style={{ margin: "10px 0 0", opacity: 0.85 }}>
-            You have <strong>{legacyWithoutAppointmentTime}</strong> booking
-            {legacyWithoutAppointmentTime === 1 ? "" : "s"} without a scheduled time (shown only on Bookings).
-          </p>
-        )}
-      </div>
+        </div>
+      )}
 
       <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
         {(["calendar", "list", "availability", "blocked"] as const).map((v) => (
@@ -2213,46 +2387,157 @@ function ScheduleTab({ bookings, reload, setTab }: {
               const key = `${cell.date.getFullYear()}-${cell.date.getMonth()}-${cell.date.getDate()}`;
               const dayBookings = bookingsByDay.get(key) ?? [];
               const isToday = cell.date.toDateString() === new Date().toDateString();
-              return (
-                <div
-                  key={idx}
-                  style={{
-                    minHeight: 100,
-                    border: `1px solid ${isToday ? "var(--color-primary)" : "var(--color-border)"}`,
-                    borderRadius: 8,
-                    padding: 6,
-                    background: cell.inMonth ? "var(--color-surface)" : "rgba(255,255,255,0.02)",
-                    opacity: cell.inMonth ? 1 : 0.5,
-                  }}
-                >
-                  <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
-                    {cell.date.getDate()}
-                  </div>
-                  <div style={{ display: "grid", gap: 3 }}>
-                    {dayBookings.slice(0, 3).map((b) => (
-                      <div
-                        key={b.id}
-                        title={`${b.name} - ${b.address}`}
+              const clickable = dayBookings.length > 0;
+              const rule = ruleByDow.get(cell.date.getDay());
+              const dowClosed = cell.inMonth && rule !== undefined && rule.enabled === false;
+              const dayBlocks = blocksByDayKey.get(key) ?? [];
+              const hasBlock = dayBlocks.length > 0;
+              const cellStyle: CSSProperties = {
+                minHeight: 100,
+                border: `1px solid ${isToday ? "var(--color-primary)" : "var(--color-border)"}`,
+                borderLeft: hasBlock
+                  ? "3px solid rgba(245, 158, 11, 0.7)"
+                  : `1px solid ${isToday ? "var(--color-primary)" : "var(--color-border)"}`,
+                borderRadius: 8,
+                padding: 6,
+                background: dowClosed
+                  ? "repeating-linear-gradient(45deg, rgba(255,255,255,0.02) 0 6px, rgba(255,255,255,0.05) 6px 12px)"
+                  : cell.inMonth
+                    ? "var(--color-surface)"
+                    : "rgba(255,255,255,0.02)",
+                opacity: cell.inMonth ? 1 : 0.5,
+                textAlign: "left",
+                font: "inherit",
+                color: "inherit",
+                cursor: clickable ? "pointer" : "default",
+                transition: "background 0.15s",
+                width: "100%",
+              };
+              const blockTooltip = hasBlock
+                ? dayBlocks
+                    .map((b) => `Blocked: ${b.reason || "(no reason given)"}`)
+                    .join("\n")
+                : undefined;
+              const cellChildren = (
+                <>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: 4,
+                      marginBottom: 4,
+                    }}
+                  >
+                    <span style={{ fontSize: 12, fontWeight: 600 }}>{cell.date.getDate()}</span>
+                    {dowClosed && (
+                      <span
                         style={{
-                          fontSize: 11,
-                          padding: "2px 6px",
-                          borderRadius: 4,
-                          ...statusBadge(b.status),
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
+                          fontSize: 9,
+                          textTransform: "uppercase",
+                          letterSpacing: 0.5,
+                          color: "var(--color-muted)",
                         }}
                       >
-                        {new Date(b.scheduledDate!).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} {b.name}
-                      </div>
-                    ))}
+                        Closed
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ display: "grid", gap: 3 }}>
+                    {dayBookings.slice(0, 3).map((b) => {
+                      const isCanceled = b.status === "CANCELED";
+                      return (
+                        <div
+                          key={b.id}
+                          title={`${b.name} - ${b.address}${isCanceled ? " (canceled)" : ""}`}
+                          style={{
+                            fontSize: 11,
+                            padding: "2px 6px",
+                            borderRadius: 4,
+                            ...statusBadge(b.status),
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                            opacity: isCanceled ? 0.45 : 1,
+                            textDecoration: isCanceled ? "line-through" : undefined,
+                          }}
+                        >
+                          {new Date(b.scheduledDate!).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} {b.name}
+                        </div>
+                      );
+                    })}
                     {dayBookings.length > 3 && (
                       <div style={{ fontSize: 10, color: "var(--color-muted)" }}>+{dayBookings.length - 3} more</div>
                     )}
                   </div>
-                </div>
+                </>
+              );
+              if (!clickable) {
+                return (
+                  <div key={idx} style={cellStyle} title={blockTooltip}>
+                    {cellChildren}
+                  </div>
+                );
+              }
+              return (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => setOpenDayKey(key)}
+                  className="schedule-day-cell"
+                  style={cellStyle}
+                  title={blockTooltip}
+                  aria-label={`Open ${cell.date.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric", year: "numeric" })} (${dayBookings.length} booking${dayBookings.length === 1 ? "" : "s"})`}
+                >
+                  {cellChildren}
+                </button>
               );
             })}
+          </div>
+
+          <div
+            style={{
+              display: "flex",
+              gap: 16,
+              marginTop: 12,
+              fontSize: 12,
+              opacity: 0.8,
+              flexWrap: "wrap",
+            }}
+          >
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+              <span
+                style={{
+                  display: "inline-block",
+                  width: 14,
+                  height: 14,
+                  borderRadius: 3,
+                  background:
+                    "repeating-linear-gradient(45deg, rgba(255,255,255,0.05) 0 4px, rgba(255,255,255,0.12) 4px 8px)",
+                  border: "1px solid var(--color-border)",
+                }}
+              />
+              Closed day
+            </span>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+              <span
+                style={{
+                  display: "inline-block",
+                  width: 14,
+                  height: 14,
+                  borderRadius: 3,
+                  borderLeft: "3px solid rgba(245, 158, 11, 0.7)",
+                  border: "1px solid var(--color-border)",
+                  borderLeftWidth: 3,
+                  borderLeftColor: "rgba(245, 158, 11, 0.7)",
+                }}
+              />
+              Has blocked time
+            </span>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+              <span style={{ textDecoration: "line-through", opacity: 0.45 }}>3:00 PM Jane</span>
+              <span style={{ opacity: 0.7 }}>= canceled</span>
+            </span>
           </div>
         </>
       )}
@@ -2266,47 +2551,65 @@ function ScheduleTab({ bookings, reload, setTab }: {
               <table className="admin-table">
                 <thead>
                   <tr>
-                    <th>Date / Time</th><th>Client</th><th>Service</th><th>Address</th><th>Status</th><th>Actions</th>
+                    <th>Date / Time</th><th>Client</th><th>Service</th><th>Address</th><th>Status</th><th>Cleaner</th><th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {scheduledList.map((b) => (
-                    <tr key={b.id}>
-                      <td style={{ whiteSpace: "nowrap" }}>{fmt(b.scheduledDate)}</td>
-                      <td>{b.name}</td>
-                      <td>{b.serviceType || <span style={{ opacity: 0.5 }}>—</span>}</td>
-                      <td>{b.address}</td>
-                      <td><span style={pillStyle(b.status)}>{b.status}</span></td>
-                      <td>
-                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                          {b.status !== "CONFIRMED" && b.status !== "CANCELED" && (
-                            <button
-                              onClick={() => setStatus(b.id, "CONFIRMED")}
-                              style={{ padding: "4px 10px", borderRadius: 8, border: "1px solid rgba(88,166,255,0.5)", color: "var(--color-secondary)", background: "transparent", cursor: "pointer", fontSize: 13 }}
-                            >
-                              Approve
-                            </button>
-                          )}
-                          {b.status !== "CANCELED" && (
-                            <button
-                              onClick={() => setStatus(b.id, "CANCELED")}
-                              style={{ padding: "4px 10px", borderRadius: 8, border: "1px solid rgba(239,68,68,0.4)", color: "#fca5a5", background: "transparent", cursor: "pointer", fontSize: 13 }}
-                            >
-                              Cancel
-                            </button>
-                          )}
-                          {b.status !== "COMPLETED" && b.status !== "CANCELED" && (
-                            <button
-                              onClick={() => setStatus(b.id, "COMPLETED")}
-                              style={{ padding: "4px 10px", borderRadius: 8, border: "1px solid rgba(34,197,94,0.4)", color: "#86efac", background: "transparent", cursor: "pointer", fontSize: 13 }}
-                            >
-                              Complete
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                  {scheduledList.map((b) => {
+                    const cleanerName = b.cleaningJob
+                      ? cleaners.find((c) => c.id === b.cleaningJob!.cleanerId)?.name ?? "—"
+                      : "—";
+                    return (
+                      <tr
+                        key={b.id}
+                        onClick={() => onOpenBooking(b.id)}
+                        style={{ cursor: "pointer" }}
+                      >
+                        <td style={{ whiteSpace: "nowrap" }}>{fmt(b.scheduledDate)}</td>
+                        <td>{b.name}</td>
+                        <td>{b.serviceType || <span style={{ opacity: 0.5 }}>—</span>}</td>
+                        <td>{b.address}</td>
+                        <td><span style={pillStyle(b.status)}>{b.status}</span></td>
+                        <td>{cleanerName}</td>
+                        <td onClick={(e) => e.stopPropagation()}>
+                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                            {b.status !== "CONFIRMED" && b.status !== "CANCELED" && (
+                              <button
+                                onClick={() => setStatus(b.id, "CONFIRMED")}
+                                style={{ padding: "4px 10px", borderRadius: 8, border: "1px solid rgba(88,166,255,0.5)", color: "var(--color-secondary)", background: "transparent", cursor: "pointer", fontSize: 13 }}
+                              >
+                                Approve
+                              </button>
+                            )}
+                            {b.status !== "CANCELED" && (
+                              <button
+                                onClick={() => {
+                                  if (window.confirm("Cancel this appointment? The customer will be emailed.")) {
+                                    setStatus(b.id, "CANCELED");
+                                  }
+                                }}
+                                style={{ padding: "4px 10px", borderRadius: 8, border: "1px solid rgba(239,68,68,0.4)", color: "#fca5a5", background: "transparent", cursor: "pointer", fontSize: 13 }}
+                              >
+                                Cancel
+                              </button>
+                            )}
+                            {b.status !== "COMPLETED" && b.status !== "CANCELED" && (
+                              <button
+                                onClick={() => {
+                                  if (window.confirm("Mark this appointment as complete?")) {
+                                    setStatus(b.id, "COMPLETED");
+                                  }
+                                }}
+                                style={{ padding: "4px 10px", borderRadius: 8, border: "1px solid rgba(34,197,94,0.4)", color: "#86efac", background: "transparent", cursor: "pointer", fontSize: 13 }}
+                              >
+                                Complete
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -2452,6 +2755,78 @@ function ScheduleTab({ bookings, reload, setTab }: {
           )}
         </>
       )}
+
+      <Modal open={!!openDayKey} onClose={() => setOpenDayKey(null)}>
+        {openDayKey && (() => {
+          const dayBookings = (bookingsByDay.get(openDayKey) ?? [])
+            .slice()
+            .sort((a, b) => new Date(a.scheduledDate!).getTime() - new Date(b.scheduledDate!).getTime());
+          const sample = dayBookings[0]?.scheduledDate
+            ? new Date(dayBookings[0].scheduledDate)
+            : (() => {
+                const [y, m, d] = openDayKey.split("-").map((n) => parseInt(n, 10));
+                return new Date(y, m, d);
+              })();
+          const titleDate = sample.toLocaleDateString([], {
+            weekday: "long", month: "long", day: "numeric", year: "numeric",
+          });
+          return (
+            <>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", gap: 16 }}>
+                <div>
+                  <h2 style={{ margin: 0, fontSize: 22 }}>{titleDate}</h2>
+                  <p style={{ marginTop: 4, opacity: 0.75, fontSize: 14 }}>
+                    {dayBookings.length} booking{dayBookings.length === 1 ? "" : "s"} scheduled
+                  </p>
+                </div>
+                <button className="btn btn-outline" onClick={() => setOpenDayKey(null)} style={{ padding: "6px 14px", fontSize: 13 }}>Close</button>
+              </div>
+
+              {dayBookings.length === 0 ? (
+                <p style={{ opacity: 0.75 }}>No bookings on this day.</p>
+              ) : (
+                <div style={{ display: "grid", gap: 8 }}>
+                  {dayBookings.map((b) => (
+                    <button
+                      key={b.id}
+                      type="button"
+                      onClick={() => {
+                        onOpenBooking(b.id);
+                        setOpenDayKey(null);
+                      }}
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "auto 1fr auto",
+                        gap: 12,
+                        alignItems: "center",
+                        padding: "10px 12px",
+                        borderRadius: 8,
+                        border: "1px solid var(--color-border)",
+                        background: "var(--color-surface)",
+                        color: "inherit",
+                        font: "inherit",
+                        textAlign: "left",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <span style={{ fontWeight: 600, fontSize: 14, minWidth: 80 }}>
+                        {new Date(b.scheduledDate!).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+                      </span>
+                      <span style={{ display: "grid", gap: 2, minWidth: 0 }}>
+                        <strong style={{ fontSize: 14 }}>{b.name}</strong>
+                        <span style={{ fontSize: 12, opacity: 0.75, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {b.serviceType ? `${b.serviceType} · ` : ""}{b.address}
+                        </span>
+                      </span>
+                      <span style={pillStyle(b.status)}>{b.status}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
+          );
+        })()}
+      </Modal>
     </>
   );
 }

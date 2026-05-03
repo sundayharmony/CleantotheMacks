@@ -78,7 +78,7 @@ function wrap(body: string): string {
 
 /* ─── Notification functions ─── */
 
-/** Sent to client + admin when a new booking is created */
+/** Sent to client + admin when a new booking request is submitted (pre-approval) */
 export async function notifyNewBooking(booking: {
   name: string;
   email: string;
@@ -87,37 +87,118 @@ export async function notifyNewBooking(booking: {
   date?: string | null;
   notes?: string | null;
 }) {
+  const safeName = escapeHtml(booking.name);
+  const safeEmail = escapeHtml(booking.email);
+  const safeAddress = escapeHtml(booking.address);
+  const safeHomeSize = escapeHtml(booking.homeSize);
+  const safeDate = booking.date ? escapeHtml(booking.date) : null;
+  const safeNotes = booking.notes ? escapeHtml(booking.notes) : null;
+
   // Email to client
   await sendEmail({
     to: booking.email,
-    subject: "Booking Confirmed - Clean to the Macks",
+    subject: "Booking request received - Clean to the Macks",
     html: wrap(`
-      <h2 style="color: #111; font-size: 18px;">Thank you, ${booking.name}!</h2>
-      <p style="color: #374151; line-height: 1.6;">Your cleaning booking has been received. Here are the details:</p>
+      <h2 style="color: #111; font-size: 18px;">Thanks, ${safeName} — we got your request!</h2>
+      <p style="color: #374151; line-height: 1.6;">
+        Your booking request has been received and is <strong>pending confirmation</strong>.
+        We'll review it shortly and send a separate confirmation email once your appointment is approved.
+      </p>
       <div style="background: #f9fafb; padding: 16px; border-radius: 8px; margin: 16px 0;">
-        <p style="margin: 4px 0;"><strong>Address:</strong> ${booking.address}</p>
-        <p style="margin: 4px 0;"><strong>Home size:</strong> ${booking.homeSize}</p>
-        ${booking.date ? `<p style="margin: 4px 0;"><strong>Preferred date:</strong> ${booking.date}</p>` : ""}
-        ${booking.notes ? `<p style="margin: 4px 0;"><strong>Notes:</strong> ${booking.notes}</p>` : ""}
+        <p style="margin: 4px 0;"><strong>Address:</strong> ${safeAddress}</p>
+        <p style="margin: 4px 0;"><strong>Home size:</strong> ${safeHomeSize}</p>
+        ${safeDate ? `<p style="margin: 4px 0;"><strong>Requested time:</strong> ${safeDate}</p>` : ""}
+        ${safeNotes ? `<p style="margin: 4px 0;"><strong>Notes:</strong> ${safeNotes}</p>` : ""}
       </div>
-      <p style="color: #374151; line-height: 1.6;">We'll confirm your appointment shortly. If you have questions, just reply to this email.</p>
+      <p style="color: #374151; line-height: 1.6;">If anything looks wrong or you have questions, just reply to this email.</p>
     `),
   });
 
   // Email to admin
   await sendEmail({
     to: ADMIN_EMAIL,
-    subject: `New Booking from ${booking.name}`,
+    subject: `New Booking Request from ${booking.name}`,
     html: wrap(`
-      <h2 style="color: #111; font-size: 18px;">New Booking Received</h2>
+      <h2 style="color: #111; font-size: 18px;">New Booking Request</h2>
       <div style="background: #f9fafb; padding: 16px; border-radius: 8px; margin: 16px 0;">
-        <p style="margin: 4px 0;"><strong>Client:</strong> ${booking.name} (${booking.email})</p>
-        <p style="margin: 4px 0;"><strong>Address:</strong> ${booking.address}</p>
-        <p style="margin: 4px 0;"><strong>Home size:</strong> ${booking.homeSize}</p>
-        ${booking.date ? `<p style="margin: 4px 0;"><strong>Preferred date:</strong> ${booking.date}</p>` : ""}
-        ${booking.notes ? `<p style="margin: 4px 0;"><strong>Notes:</strong> ${booking.notes}</p>` : ""}
+        <p style="margin: 4px 0;"><strong>Client:</strong> ${safeName} (${safeEmail})</p>
+        <p style="margin: 4px 0;"><strong>Address:</strong> ${safeAddress}</p>
+        <p style="margin: 4px 0;"><strong>Home size:</strong> ${safeHomeSize}</p>
+        ${safeDate ? `<p style="margin: 4px 0;"><strong>Requested time:</strong> ${safeDate}</p>` : ""}
+        ${safeNotes ? `<p style="margin: 4px 0;"><strong>Notes:</strong> ${safeNotes}</p>` : ""}
       </div>
-      <p style="color: #374151;">Log in to the admin dashboard to review and assign a cleaner.</p>
+      <p style="color: #374151;">Log in to the admin dashboard to approve, assign a cleaner, or cancel.</p>
+    `),
+  });
+}
+
+/** Sent to client when admin approves their request (status NEW -> CONFIRMED) */
+export async function notifyBookingConfirmed(data: {
+  clientName: string;
+  clientEmail: string;
+  scheduledDate?: string | null;
+  address?: string | null;
+  serviceType?: string | null;
+}) {
+  const safeName = escapeHtml(data.clientName);
+  const safeDate = data.scheduledDate ? escapeHtml(data.scheduledDate) : null;
+  const safeAddress = data.address ? escapeHtml(data.address) : null;
+  const safeService = data.serviceType ? escapeHtml(data.serviceType) : null;
+
+  await sendEmail({
+    to: data.clientEmail,
+    subject: "Your appointment is confirmed - Clean to the Macks",
+    html: wrap(`
+      <h2 style="color: #111; font-size: 18px;">You're all set, ${safeName}!</h2>
+      <p style="color: #374151; line-height: 1.6;">
+        Your appointment with Clean to the Macks has been <strong>confirmed</strong>.
+        Here are the details:
+      </p>
+      <div style="background: #f9fafb; padding: 16px; border-radius: 8px; margin: 16px 0;">
+        ${safeDate ? `<p style="margin: 4px 0;"><strong>When:</strong> ${safeDate}</p>` : ""}
+        ${safeService ? `<p style="margin: 4px 0;"><strong>Service:</strong> ${safeService}</p>` : ""}
+        ${safeAddress ? `<p style="margin: 4px 0;"><strong>Address:</strong> ${safeAddress}</p>` : ""}
+      </div>
+      <p style="color: #374151; line-height: 1.6;">
+        <strong>What to expect:</strong> our crew will arrive within a 15-minute window of your start time.
+        Please make sure we can access the property and let us know if anything has changed.
+      </p>
+      <p style="color: #374151; line-height: 1.6;">
+        Need to make a change? Just reply to this email.
+      </p>
+    `),
+  });
+}
+
+/** Sent to client when admin changes their appointment date/time */
+export async function notifyBookingRescheduled(data: {
+  clientName: string;
+  clientEmail: string;
+  oldScheduledDate?: string | null;
+  newScheduledDate: string;
+  address?: string | null;
+}) {
+  const safeName = escapeHtml(data.clientName);
+  const safeOld = data.oldScheduledDate ? escapeHtml(data.oldScheduledDate) : null;
+  const safeNew = escapeHtml(data.newScheduledDate);
+  const safeAddress = data.address ? escapeHtml(data.address) : null;
+
+  await sendEmail({
+    to: data.clientEmail,
+    subject: "Your appointment time has changed - Clean to the Macks",
+    html: wrap(`
+      <h2 style="color: #111; font-size: 18px;">Hi ${safeName},</h2>
+      <p style="color: #374151; line-height: 1.6;">
+        We've updated the time of your upcoming appointment.
+      </p>
+      <div style="background: #f9fafb; padding: 16px; border-radius: 8px; margin: 16px 0;">
+        ${safeOld ? `<p style="margin: 4px 0;"><strong>Previous time:</strong> ${safeOld}</p>` : ""}
+        <p style="margin: 4px 0;"><strong>New time:</strong> ${safeNew}</p>
+        ${safeAddress ? `<p style="margin: 4px 0;"><strong>Address:</strong> ${safeAddress}</p>` : ""}
+      </div>
+      <p style="color: #374151; line-height: 1.6;">
+        If this new time doesn't work for you, just reply to this email and we'll find another slot.
+      </p>
     `),
   });
 }

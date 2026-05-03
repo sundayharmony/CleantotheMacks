@@ -68,7 +68,7 @@ export async function GET(request: Request) {
     const busy: SlotRange[] = [];
     for (const b of bookings) {
       if (!b.scheduledDate) continue;
-      const minutes = 60;
+      const minutes = b.slotMinutes ?? 60;
       busy.push({
         startAt: b.scheduledDate,
         endAt: new Date(b.scheduledDate.getTime() + minutes * 60 * 1000),

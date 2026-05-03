@@ -57,8 +57,8 @@ async function isSlotAvailable(scheduledDate: Date, slotMinutes: number): Promis
   const busy: SlotRange[] = [];
   for (const b of bookings) {
     if (!b.scheduledDate) continue;
-    /* Slot length column may not exist until migrations run; default matches generator */
-    const minutes = 60;
+    /* slotMinutes is null on legacy rows / pre-migration DBs; default to 60 */
+    const minutes = b.slotMinutes ?? 60;
     busy.push({
       startAt: b.scheduledDate,
       endAt: new Date(b.scheduledDate.getTime() + minutes * 60 * 1000),
@@ -143,6 +143,46 @@ export async function POST(request: Request) {
     }
   }
 
+  let clientId: string | null = null;
+  try {
+    const existingClient = await prisma.client.findUnique({ where: { email } });
+    if (existingClient) {
+      /* Preserve every existing Client field — only reuse the id to link this booking. */
+      clientId = existingClient.id;
+    } else {
+      try {
+        const created = await prisma.client.create({
+          data: {
+            name,
+            email,
+            phone: phone || null,
+            address,
+          },
+        });
+        clientId = created.id;
+      } catch (createErr) {
+        /* Race: another request inserted the same email between findUnique and create. */
+        if (
+          createErr instanceof Prisma.PrismaClientKnownRequestError &&
+          createErr.code === "P2002"
+        ) {
+          const raced = await prisma.client.findUnique({ where: { email } });
+          if (raced) {
+            clientId = raced.id;
+          } else {
+            throw createErr;
+          }
+        } else {
+          throw createErr;
+        }
+      }
+    }
+  } catch (clientErr) {
+    /* Don't block the booking if client linking fails — log and continue unlinked. */
+    console.error("POST /api/book client upsert failed:", clientErr);
+    clientId = null;
+  }
+
   const fullCreate = {
     name,
     email,
@@ -154,6 +194,7 @@ export async function POST(request: Request) {
     serviceType,
     scheduledDate: scheduledDate ?? undefined,
     slotMinutes: scheduledDate ? slotMinutes : null,
+    clientId: clientId ?? undefined,
   } satisfies Parameters<typeof prisma.booking.create>[0]["data"];
 
   try {
