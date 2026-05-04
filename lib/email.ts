@@ -2,20 +2,31 @@
  * Email notification utility for Clean to the Macks.
  *
  * Uses the Resend API (https://resend.com) for transactional email.
- * Set RESEND_API_KEY and EMAIL_FROM in your environment variables.
  *
- * If RESEND_API_KEY is not set, emails are logged to the console instead
- * of being sent, so the app never crashes due to missing email config.
+ * Required for real delivery:
+ * - RESEND_API_KEY — API key from Resend.
+ * - EMAIL_FROM — Must use an address on a domain you have verified in Resend
+ *   (Dashboard → Domains). Sending from @cleantothemacks.com before DNS
+ *   verification completes causes 550 / “domain is not verified” bounces.
+ * - ADMIN_EMAIL — Inbox that receives new booking alerts and other admin mail.
+ *
+ * Optional:
+ * - BOOKING_REPLY_TO — Reply-To on client-facing booking mail (defaults to ADMIN_EMAIL).
+ *
+ * If RESEND_API_KEY is not set, sends are skipped and logged so the app never crashes.
  */
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const EMAIL_FROM = process.env.EMAIL_FROM || "Clean to the Macks <noreply@cleantothemacks.com>";
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "sales@sundayharmony.com";
+const BOOKING_REPLY_TO = process.env.BOOKING_REPLY_TO || ADMIN_EMAIL;
 
 interface EmailPayload {
   to: string | string[];
   subject: string;
   html: string;
+  /** Resend `reply_to` — where “Reply” in the mail client should go */
+  replyTo?: string;
 }
 
 function escapeHtml(value: string): string {
@@ -27,6 +38,25 @@ function escapeHtml(value: string): string {
     .replaceAll("'", "&#39;");
 }
 
+function logResendFailure(status: number, errBody: string) {
+  let message = errBody;
+  let hint = "";
+  try {
+    const parsed = JSON.parse(errBody) as { message?: string };
+    if (parsed?.message) message = parsed.message;
+    const lower = message.toLowerCase();
+    if (lower.includes("domain") && lower.includes("verif")) {
+      hint =
+        " Verify cleantothemacks.com (or your chosen domain) in Resend: https://resend.com/domains — then set EMAIL_FROM to an address on that domain.";
+    } else if (lower.includes("from") || lower.includes("sender")) {
+      hint = " Check EMAIL_FROM matches a verified domain and allowed sender in Resend.";
+    }
+  } catch {
+    /* errBody was not JSON */
+  }
+  console.error(`[EMAIL] Resend HTTP ${status}:`, message, hint || "");
+}
+
 async function sendEmail(payload: EmailPayload): Promise<boolean> {
   if (!RESEND_API_KEY) {
     console.log("[EMAIL STUB]", payload.subject, "->", payload.to);
@@ -34,46 +64,62 @@ async function sendEmail(payload: EmailPayload): Promise<boolean> {
   }
 
   try {
+    const body: Record<string, unknown> = {
+      from: EMAIL_FROM,
+      to: Array.isArray(payload.to) ? payload.to : [payload.to],
+      subject: payload.subject,
+      html: payload.html,
+    };
+    if (payload.replyTo) body.reply_to = payload.replyTo;
+
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${RESEND_API_KEY}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        from: EMAIL_FROM,
-        to: Array.isArray(payload.to) ? payload.to : [payload.to],
-        subject: payload.subject,
-        html: payload.html,
-      }),
+      body: JSON.stringify(body),
     });
 
     if (!res.ok) {
       const err = await res.text();
-      console.error("[EMAIL ERROR]", err);
+      logResendFailure(res.status, err);
       return false;
     }
     return true;
   } catch (err) {
-    console.error("[EMAIL ERROR]", err);
+    console.error("[EMAIL] Network or unexpected error:", err);
     return false;
   }
 }
 
 /* ─── Wrapper helper for branded HTML ─── */
 
+const EMAIL_FONT_STACK =
+  "'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+
 function wrap(body: string): string {
-  return `
-    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px 20px;">
-      <div style="text-align: center; margin-bottom: 24px;">
-        <strong style="font-size: 20px; color: #111;">Clean to the Macks</strong>
-      </div>
-      ${body}
-      <div style="margin-top: 32px; padding-top: 16px; border-top: 1px solid #e5e7eb; text-align: center; font-size: 12px; color: #9ca3af;">
-        Clean to the Macks &mdash; Reliable residential cleaning
-      </div>
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+</head>
+<body style="margin:0;background:#f9fafb;color:#111;font-family:${EMAIL_FONT_STACK};">
+  <div style="max-width:560px;margin:0 auto;padding:32px 20px;">
+    <div style="text-align:center;margin-bottom:24px;">
+      <strong style="font-size:20px;color:#111;">Clean to the Macks</strong>
     </div>
-  `;
+    ${body}
+    <div style="margin-top:32px;padding-top:16px;border-top:1px solid #e5e7eb;text-align:center;font-size:12px;color:#9ca3af;">
+      Clean to the Macks &mdash; Reliable residential cleaning
+    </div>
+  </div>
+</body>
+</html>`;
 }
 
 /* ─── Notification functions ─── */
@@ -94,11 +140,7 @@ export async function notifyNewBooking(booking: {
   const safeDate = booking.date ? escapeHtml(booking.date) : null;
   const safeNotes = booking.notes ? escapeHtml(booking.notes) : null;
 
-  // Email to client
-  await sendEmail({
-    to: booking.email,
-    subject: "Booking request received - Clean to the Macks",
-    html: wrap(`
+  const clientHtml = wrap(`
       <h2 style="color: #111; font-size: 18px;">Thanks, ${safeName} — we got your request!</h2>
       <p style="color: #374151; line-height: 1.6;">
         Your booking request has been received and is <strong>pending confirmation</strong>.
@@ -111,14 +153,9 @@ export async function notifyNewBooking(booking: {
         ${safeNotes ? `<p style="margin: 4px 0;"><strong>Notes:</strong> ${safeNotes}</p>` : ""}
       </div>
       <p style="color: #374151; line-height: 1.6;">If anything looks wrong or you have questions, just reply to this email.</p>
-    `),
-  });
+    `);
 
-  // Email to admin
-  await sendEmail({
-    to: ADMIN_EMAIL,
-    subject: `New Booking Request from ${booking.name}`,
-    html: wrap(`
+  const adminHtml = wrap(`
       <h2 style="color: #111; font-size: 18px;">New Booking Request</h2>
       <div style="background: #f9fafb; padding: 16px; border-radius: 8px; margin: 16px 0;">
         <p style="margin: 4px 0;"><strong>Client:</strong> ${safeName} (${safeEmail})</p>
@@ -128,8 +165,29 @@ export async function notifyNewBooking(booking: {
         ${safeNotes ? `<p style="margin: 4px 0;"><strong>Notes:</strong> ${safeNotes}</p>` : ""}
       </div>
       <p style="color: #374151;">Log in to the admin dashboard to approve, assign a cleaner, or cancel.</p>
-    `),
-  });
+    `);
+
+  const [clientOk, adminOk] = await Promise.all([
+    sendEmail({
+      to: booking.email,
+      subject: "Booking request received - Clean to the Macks",
+      html: clientHtml,
+      replyTo: BOOKING_REPLY_TO,
+    }),
+    sendEmail({
+      to: ADMIN_EMAIL,
+      subject: `New Booking Request from ${booking.name}`,
+      html: adminHtml,
+      replyTo: booking.email,
+    }),
+  ]);
+
+  if (!clientOk) {
+    console.error("[EMAIL] Client booking receipt was not sent. Check Resend logs and EMAIL_FROM / domain verification.");
+  }
+  if (!adminOk) {
+    console.error("[EMAIL] Admin booking alert was not sent. Check ADMIN_EMAIL and Resend configuration.");
+  }
 }
 
 /** Sent to client when admin approves their request (status NEW -> CONFIRMED) */

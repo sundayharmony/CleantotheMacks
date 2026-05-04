@@ -25,8 +25,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className={montserrat.variable}>
+    <html lang="en" className={`${montserrat.variable} ${montserrat.className}`}>
+      <body>
         <a href="#main" className="skip-link">Skip to content</a>
         <SiteHeader />
         <main id="main">{children}</main>

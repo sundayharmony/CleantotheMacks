@@ -18,15 +18,26 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 ### Environment
 
-Create a `.env` file with a SQLite connection for local development:
+Copy `.env.example` to `.env` and fill in values. At minimum for local development:
 
 ```
 DATABASE_URL="file:./dev.db"
 ```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Booking email (Resend)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+New bookings trigger two messages: a receipt to the client and an alert to your team. Both go through [Resend](https://resend.com).
+
+**Gmail “Send mail as,” ImprovMX forwarding, and Wix DNS** are documented in [docs/EMAIL_SETUP.md](docs/EMAIL_SETUP.md) (Path A: move DNS for full Resend; Path B: Gmail send-through while DNS stays on Wix).
+
+1. Create a Resend account and an API key; set `RESEND_API_KEY` in `.env` (and in your host’s environment variables, e.g. Vercel).
+2. **Verify your domain** in Resend: [Domains](https://resend.com/domains) → add `cleantothemacks.com` → add the DNS records they show (often SPF/DKIM). Until this shows **Verified**, Resend will reject mail from `@cleantothemacks.com` with errors like *domain is not verified* (550). If DNS is on **Wix**, you may need to move DNS to complete Resend **Enable Sending**; see [docs/EMAIL_SETUP.md](docs/EMAIL_SETUP.md).
+3. Set `EMAIL_FROM` to a sender on that verified domain, for example: `Clean to the Macks <booking@cleantothemacks.com>`.
+4. Set `ADMIN_EMAIL` to the inbox where you want **new booking request** notifications (this is separate from Gmail “Send mail as”; the app sends via Resend, not through your Gmail SMTP).
+
+Optional: `BOOKING_REPLY_TO` sets the **Reply-To** on the client receipt (defaults to `ADMIN_EMAIL`).
+
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 ## Learn More
 
