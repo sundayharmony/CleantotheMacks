@@ -28,10 +28,10 @@ DATABASE_URL="file:./dev.db"
 
 New bookings trigger two messages: a receipt to the client and an alert to your team. Both go through [Resend](https://resend.com).
 
-**Gmail “Send mail as,” ImprovMX forwarding, and Wix DNS** are documented in [docs/EMAIL_SETUP.md](docs/EMAIL_SETUP.md) (Path A: move DNS for full Resend; Path B: Gmail send-through while DNS stays on Wix).
+**Gmail “Send mail as,” ImprovMX forwarding, and DNS (e.g. Hostinger)** are documented in [docs/EMAIL_SETUP.md](docs/EMAIL_SETUP.md) (Path A: DNS that supports Resend `send` records; Path B: Gmail send-through if DNS is limited).
 
 1. Create a Resend account and an API key; set `RESEND_API_KEY` in `.env` (and in your host’s environment variables, e.g. Vercel).
-2. **Verify your domain** in Resend: [Domains](https://resend.com/domains) → add `cleantothemacks.com` → add the DNS records they show (often SPF/DKIM). Until this shows **Verified**, Resend will reject mail from `@cleantothemacks.com` with errors like *domain is not verified* (550). If DNS is on **Wix**, you may need to move DNS to complete Resend **Enable Sending**; see [docs/EMAIL_SETUP.md](docs/EMAIL_SETUP.md).
+2. **Verify your domain** in Resend: [Domains](https://resend.com/domains) → add `cleantothemacks.com` → add the DNS records they show (SPF/DKIM and the `send` MX/SPF for sending). Until this shows **Verified**, Resend will reject mail from `@cleantothemacks.com` with errors like *domain is not verified* (550). Add those records in **your DNS host** (e.g. Hostinger); see [docs/EMAIL_SETUP.md](docs/EMAIL_SETUP.md).
 3. Set `EMAIL_FROM` to a sender on that verified domain, for example: `Clean to the Macks <booking@cleantothemacks.com>`.
 4. Set `ADMIN_EMAIL` to the inbox where you want **new booking request** notifications (this is separate from Gmail “Send mail as”; the app sends via Resend, not through your Gmail SMTP).
 

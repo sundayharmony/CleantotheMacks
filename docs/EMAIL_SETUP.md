@@ -8,7 +8,7 @@
 - Gmail **Send mail as** `contact@cleantothemacks.com` through **smtp.resend.com**
 - Resend’s domain dashboard to show **Enable Sending** as fully verified
 
-**Wix DNS cannot complete Resend’s requirements** (subdomain MX on `send`), so Path A requires **moving DNS** to a host that supports those records (e.g. **Cloudflare** free).
+Some DNS panels (e.g. **Wix** in the past) could not add the **subdomain MX** Resend needs for `send`. Path A requires **DNS at a host that supports those records** (e.g. **Hostinger** hPanel, **Cloudflare**, or many registrars).
 
 **Use Path B** if you need the Gmail alias working **quickly** and can migrate DNS later. Path B uses **Gmail’s own send path** for the alias and does not depend on Resend SMTP in Gmail. The app may still be unable to send via Resend until you complete Path A or fix DNS elsewhere.
 
@@ -18,7 +18,7 @@
 
 ### 1. Choose a DNS host
 
-Use **Cloudflare** (or any DNS that allows **MX on a subdomain** like `send`). Point the domain’s **nameservers** at that host (at your registrar). Wix can continue to host the site; only **DNS** moves.
+Use **Cloudflare**, **Hostinger DNS**, or any provider that allows **MX on a subdomain** like `send`. Point the domain’s **nameservers** at that DNS host (at your registrar). The **website stays on Vercel**; only **where DNS is edited** changes.
 
 ### 2. Copy existing records into the new zone
 
@@ -114,6 +114,6 @@ Use when you are **not** ready to move DNS.
 
 ---
 
-## Wix-specific note
+## DNS host limitations
 
-If DNS remains on **Wix**, Resend may show: *Wix doesn’t support subdomains for MX records* — you cannot fix that in-panel; you must use **Path B** for Gmail or **move DNS (Path A)** for full Resend.
+If your DNS provider cannot add **MX on** `send.*`, Resend **Enable Sending** will stay broken until you use a provider that can (Hostinger, Cloudflare, etc.) or use **Path B** for Gmail only.
