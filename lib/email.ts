@@ -59,8 +59,14 @@ function logResendFailure(status: number, errBody: string) {
 
 async function sendEmail(payload: EmailPayload): Promise<boolean> {
   if (!RESEND_API_KEY) {
-    console.log("[EMAIL STUB]", payload.subject, "->", payload.to);
-    return true;
+    console.error(
+      "[EMAIL] Skipped send (RESEND_API_KEY is not set). Subject:",
+      payload.subject,
+      "To:",
+      payload.to,
+      "— Set RESEND_API_KEY in the host environment (e.g. Vercel → Settings → Environment Variables).",
+    );
+    return false;
   }
 
   try {
@@ -133,6 +139,13 @@ export async function notifyNewBooking(booking: {
   date?: string | null;
   notes?: string | null;
 }) {
+  if (!RESEND_API_KEY) {
+    console.error(
+      "[EMAIL] notifyNewBooking: RESEND_API_KEY is not set — client and admin booking emails were not sent. Configure it on your host (e.g. Vercel).",
+    );
+    return;
+  }
+
   const safeName = escapeHtml(booking.name);
   const safeEmail = escapeHtml(booking.email);
   const safeAddress = escapeHtml(booking.address);

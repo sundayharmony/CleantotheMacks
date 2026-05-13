@@ -33,7 +33,8 @@ New bookings trigger two messages: a receipt to the client and an alert to your 
 1. Create a Resend account and an API key; set `RESEND_API_KEY` in `.env` (and in your host’s environment variables, e.g. Vercel).
 2. **Verify your domain** in Resend: [Domains](https://resend.com/domains) → add `cleantothemacks.com` → add the DNS records they show (SPF/DKIM and the `send` MX/SPF for sending). Until this shows **Verified**, Resend will reject mail from `@cleantothemacks.com` with errors like *domain is not verified* (550). Add those records in **your DNS host** (e.g. Hostinger); see [docs/EMAIL_SETUP.md](docs/EMAIL_SETUP.md).
 3. Set `EMAIL_FROM` to a sender on that verified domain, for example: `Clean to the Macks <booking@cleantothemacks.com>`.
-4. Set `ADMIN_EMAIL` to the inbox where you want **new booking request** notifications (this is separate from Gmail “Send mail as”; the app sends via Resend, not through your Gmail SMTP).
+4. Set `ADMIN_EMAIL` to the inbox where you want **new booking request** notifications (this is separate from Gmail “Send mail as”; the app sends via Resend, not through your Gmail SMTP). If unset, the code falls back to a placeholder address — always set this on **Vercel** for production.
+5. After changing env vars on Vercel, **redeploy** (or wait for the next deployment) so the server picks up `RESEND_API_KEY` and `ADMIN_EMAIL`. Without `RESEND_API_KEY`, booking requests still save but **no emails are sent** (check Vercel → Deployment → Logs for `[EMAIL]` lines).
 
 Optional: `BOOKING_REPLY_TO` sets the **Reply-To** on the client receipt (defaults to `ADMIN_EMAIL`).
 

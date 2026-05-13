@@ -221,7 +221,9 @@ export async function POST(request: Request) {
       homeSize,
       date: scheduledDate ? scheduledDate.toLocaleString() : null,
       notes,
-    }).catch(() => {});
+    }).catch((emailErr) => {
+      console.error("[BOOKING] notifyNewBooking failed after booking create:", emailErr);
+    });
 
     return NextResponse.json({ success: true, id: booking.id });
   } catch (err) {
