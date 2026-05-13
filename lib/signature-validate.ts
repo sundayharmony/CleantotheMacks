@@ -1,6 +1,7 @@
 /** Max stored PNG data URL length (~1.1MB base64) */
 const MAX_DATA_URL_LENGTH = 1_200_000;
-const MIN_DATA_URL_LENGTH = 2200;
+/** Small but non-trivial PNG data URLs from a minimal stroke (~1–3KB base64) */
+const MIN_DATA_URL_LENGTH = 900;
 
 /**
  * Accept only PNG data URLs from our canvas client to reduce abuse surface.

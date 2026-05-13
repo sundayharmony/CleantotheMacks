@@ -8,6 +8,10 @@ type Props = {
   onSignatureChange: (dataUrl: string | null) => void;
 };
 
+/**
+ * Follows signature_pad resize guidance: create the pad first, then set canvas
+ * pixel size, scale the 2D context for DPR, and call pad.clear() so isEmpty is correct.
+ */
 export default function VideoSignaturePad({ onSignatureChange }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -26,41 +30,39 @@ export default function VideoSignaturePad({ onSignatureChange }: Props) {
     const wrap = wrapRef.current;
     const canvas = canvasRef.current;
     if (!wrap || !canvas) return;
+    const wrapEl = wrap;
+    const canvasEl = canvas;
 
-    const setup = () => {
-      padRef.current?.off();
-      padRef.current = null;
+    const pad = new SignaturePad(canvasEl, {
+      minWidth: 0.45,
+      maxWidth: 2.4,
+      penColor: "#0f172a",
+      backgroundColor: "#ffffff",
+    });
+    padRef.current = pad;
+    pad.addEventListener("endStroke", syncFromPad);
 
-      const width = Math.max(wrap.clientWidth, 280);
+    function resize() {
+      const width = Math.max(wrapEl.clientWidth, 280);
       const height = 180;
       const ratio = Math.max(window.devicePixelRatio || 1, 1);
-
-      canvas.width = Math.floor(width * ratio);
-      canvas.height = Math.floor(height * ratio);
-      canvas.style.width = `${width}px`;
-      canvas.style.height = `${height}px`;
-
-      const ctx = canvas.getContext("2d");
+      canvasEl.width = Math.floor(width * ratio);
+      canvasEl.height = Math.floor(height * ratio);
+      canvasEl.style.width = `${width}px`;
+      canvasEl.style.height = `${height}px`;
+      const ctx = canvasEl.getContext("2d");
       if (ctx) {
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.scale(ratio, ratio);
       }
-
-      const pad = new SignaturePad(canvas, {
-        minWidth: 0.45,
-        maxWidth: 2.4,
-        penColor: "#0f172a",
-        backgroundColor: "#ffffff",
-      });
-      padRef.current = pad;
-      pad.addEventListener("endStroke", syncFromPad);
+      pad.clear();
       onChangeRef.current(null);
-    };
+    }
 
-    setup();
+    resize();
 
     return () => {
-      padRef.current?.off();
+      pad.off();
       padRef.current = null;
     };
   }, [syncFromPad]);

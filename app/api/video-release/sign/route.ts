@@ -6,14 +6,18 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
-  const body = (await request.json()) as {
+  let body: {
     token?: string;
     signerName?: string;
     signatureImageDataUrl?: string;
-    /** Legacy submissions (typed line only) — no longer used by the public form */
     signatureText?: string;
     agreed?: boolean;
   };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ success: false, error: "Invalid JSON body" }, { status: 400 });
+  }
 
   const token = body.token?.trim();
   const signerName = body.signerName?.trim();
