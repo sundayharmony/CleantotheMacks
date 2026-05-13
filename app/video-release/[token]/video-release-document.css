@@ -1,0 +1,206 @@
+/* Video / media release — public signing page (scoped via parent class) */
+
+.release-doc {
+  max-width: 720px;
+  margin: 0 auto;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+
+.release-doc__masthead {
+  background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%);
+  color: #f8fafc;
+  padding: 28px 32px 24px;
+}
+
+.release-doc__masthead-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #93c5fd;
+  margin-bottom: 10px;
+}
+
+.release-doc__masthead h1 {
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  margin: 0 0 8px;
+}
+
+.release-doc__masthead-meta {
+  font-size: 13px;
+  color: #cbd5e1;
+  line-height: 1.5;
+}
+
+.release-doc__body {
+  padding: 28px 32px 32px;
+}
+
+.release-doc__intro {
+  font-size: 15px;
+  color: var(--color-muted);
+  line-height: 1.65;
+  margin-bottom: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.release-doc__parties {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 24px;
+  font-size: 14px;
+}
+
+.release-doc__parties dt {
+  font-weight: 600;
+  color: var(--color-subtle);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.release-doc__parties dd {
+  margin: 0;
+  color: var(--color-text);
+  font-weight: 500;
+}
+
+.release-doc__clauses {
+  counter-reset: clause;
+  margin: 0 0 24px;
+  padding: 0;
+  list-style: none;
+}
+
+.release-doc__clauses li {
+  counter-increment: clause;
+  position: relative;
+  padding-left: 2.25rem;
+  margin-bottom: 14px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--color-text);
+}
+
+.release-doc__clauses li::before {
+  content: counter(clause) ".";
+  position: absolute;
+  left: 0;
+  font-weight: 700;
+  color: var(--color-primary);
+  width: 1.75rem;
+}
+
+.release-doc__esign-notice {
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--color-muted);
+  background: var(--color-surface-2);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 24px;
+}
+
+.release-doc__section-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-subtle);
+  margin: 0 0 10px;
+}
+
+.release-doc label.release-doc__label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: 8px;
+}
+
+.release-doc__signature-block {
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius);
+  background: #fafbfc;
+  padding: 16px;
+  margin-bottom: 18px;
+}
+
+.release-signature-pad__canvas-wrap {
+  width: 100%;
+  min-height: 180px;
+  background: #fff;
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.release-signature-pad__canvas {
+  display: block;
+  width: 100%;
+  height: 180px;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.release-signature-pad__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.release-signature-pad__hint {
+  font-size: 12px;
+  color: var(--color-muted);
+}
+
+.release-doc__checkbox-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 20px;
+  padding: 14px 16px;
+  background: var(--color-surface-2);
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+}
+
+.release-doc__checkbox-row input {
+  width: 20px;
+  height: 20px;
+  margin-top: 2px;
+  accent-color: var(--color-primary);
+  flex-shrink: 0;
+}
+
+.release-doc__checkbox-row span {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.5;
+  color: var(--color-text);
+}
+
+.release-doc__submit {
+  width: 100%;
+}
+
+@media print {
+  .release-doc {
+    box-shadow: none;
+    border: 1px solid #ccc;
+  }
+  .release-signature-pad__actions .btn {
+    display: none;
+  }
+}

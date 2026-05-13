@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { isValidSignaturePngDataUrl } from "@/lib/signature-validate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -8,17 +9,32 @@ export async function POST(request: Request) {
   const body = (await request.json()) as {
     token?: string;
     signerName?: string;
+    signatureImageDataUrl?: string;
+    /** Legacy submissions (typed line only) — no longer used by the public form */
     signatureText?: string;
     agreed?: boolean;
   };
 
   const token = body.token?.trim();
   const signerName = body.signerName?.trim();
-  const signatureText = body.signatureText?.trim();
+  const signatureImageDataUrl = body.signatureImageDataUrl?.trim();
   const agreed = body.agreed === true;
 
-  if (!token || !signerName || !signatureText || !agreed) {
+  if (!token || !signerName || !agreed) {
     return NextResponse.json({ success: false, error: "Missing required fields" }, { status: 400 });
+  }
+
+  const hasDrawnSignature = isValidSignaturePngDataUrl(signatureImageDataUrl);
+  const legacyTyped =
+    !hasDrawnSignature &&
+    typeof body.signatureText === "string" &&
+    body.signatureText.trim().length >= 2;
+
+  if (!hasDrawnSignature && !legacyTyped) {
+    return NextResponse.json(
+      { success: false, error: "A drawn signature is required" },
+      { status: 400 },
+    );
   }
 
   try {
@@ -49,7 +65,8 @@ export async function POST(request: Request) {
         status: "SIGNED",
         signedAt: new Date(),
         signerName,
-        signatureText,
+        signatureText: legacyTyped ? body.signatureText!.trim() : null,
+        signatureImageDataUrl: hasDrawnSignature ? signatureImageDataUrl! : null,
         signerIp: signerIp || null,
         signerUserAgent: signerUserAgent || null,
       },

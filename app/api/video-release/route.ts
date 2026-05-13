@@ -29,6 +29,7 @@ export async function GET() {
         signedAt: true,
         signerName: true,
         signatureText: true,
+        signatureImageDataUrl: true,
         signerIp: true,
         signerUserAgent: true,
       },

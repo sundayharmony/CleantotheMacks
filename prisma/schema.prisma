@@ -128,6 +128,8 @@ model VideoRelease {
   signedAt       DateTime?
   signerName     String?
   signatureText  String?
+  /** PNG data URL from drawn signature (client canvas) */
+  signatureImageDataUrl String?
   signerIp       String?
   signerUserAgent String?
 }

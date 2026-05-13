@@ -249,6 +249,7 @@ type VideoRelease = {
   signedAt: string | null;
   signerName: string | null;
   signatureText: string | null;
+  signatureImageDataUrl: string | null;
   signerIp: string | null;
   signerUserAgent: string | null;
 };
@@ -2318,8 +2319,34 @@ function VideoReleasesTab({
               <div><b>Signed at:</b> {fmt(selected.signedAt)}</div>
               <div><b>Signer name:</b> {selected.signerName || "—"}</div>
             </div>
-            <div><b>Signature:</b> {selected.signatureText || "—"}</div>
-            <div><b>Signer IP:</b> {selected.signerIp || "—"}</div>
+            {selected.signatureImageDataUrl ? (
+              <div style={{ marginTop: 16 }}>
+                <b>Signature</b>
+                <div
+                  style={{
+                    marginTop: 8,
+                    padding: 12,
+                    background: "#fff",
+                    border: "1px solid var(--color-border-strong)",
+                    borderRadius: 8,
+                    maxWidth: 480,
+                  }}
+                >
+                  <img
+                    src={selected.signatureImageDataUrl}
+                    alt="Captured signature"
+                    style={{ maxWidth: "100%", maxHeight: 200, display: "block" }}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div style={{ marginTop: 8 }}>
+                <b>Signature (typed, legacy):</b> {selected.signatureText || "—"}
+              </div>
+            )}
+            <div style={{ marginTop: 12 }}>
+              <b>Signer IP:</b> {selected.signerIp || "—"}
+            </div>
             <div><b>User Agent:</b> {selected.signerUserAgent || "—"}</div>
           </>
         )}
