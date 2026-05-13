@@ -1,5 +1,11 @@
 # Clean to the Macks — Email (Gmail alias, Resend, ImprovMX)
 
+## Current stack (chosen)
+
+- **Receiving:** [ImprovMX](https://improvmx.com) — MX on `@` → `mx1.improvmx.com` / `mx2.improvmx.com`; SPF includes `include:spf.improvmx.com`.
+- **Sending:** [Resend](https://resend.com) — API + optional Gmail SMTP; DKIM + **`send`** subdomain MX/SPF from the Resend domain page.
+- **DNS:** Hostinger hPanel (nameservers Hostinger). Site stays on **Vercel** (apex `A` / `www` CNAME).
+
 ## Decision (Path A vs Path B)
 
 **Use Path A** if you need all of the following:
