@@ -16,10 +16,16 @@
  * If RESEND_API_KEY is not set, sends are skipped and logged so the app never crashes.
  */
 
-const RESEND_API_KEY = process.env.RESEND_API_KEY;
-const EMAIL_FROM = process.env.EMAIL_FROM || "Clean to the Macks <noreply@cleantothemacks.com>";
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "sales@sundayharmony.com";
-const BOOKING_REPLY_TO = process.env.BOOKING_REPLY_TO || ADMIN_EMAIL;
+function envTrim(value: string | undefined): string | undefined {
+  const t = value?.trim();
+  return t === "" ? undefined : t;
+}
+
+const RESEND_API_KEY = envTrim(process.env.RESEND_API_KEY);
+const EMAIL_FROM =
+  envTrim(process.env.EMAIL_FROM) || "Clean to the Macks <noreply@cleantothemacks.com>";
+const ADMIN_EMAIL = envTrim(process.env.ADMIN_EMAIL) || "sales@sundayharmony.com";
+const BOOKING_REPLY_TO = envTrim(process.env.BOOKING_REPLY_TO) || ADMIN_EMAIL;
 
 interface EmailPayload {
   to: string | string[];
@@ -199,7 +205,14 @@ export async function notifyNewBooking(booking: {
     console.error("[EMAIL] Client booking receipt was not sent. Check Resend logs and EMAIL_FROM / domain verification.");
   }
   if (!adminOk) {
-    console.error("[EMAIL] Admin booking alert was not sent. Check ADMIN_EMAIL and Resend configuration.");
+    console.error(
+      "[EMAIL] Admin booking alert was not sent. Confirm Vercel ADMIN_EMAIL (no spaces/quotes), spam folder, and Resend → Logs for that recipient.",
+    );
+    if (clientOk) {
+      console.error(
+        "[EMAIL] Client receipt succeeded but team copy failed — usually ADMIN_EMAIL typo, Gmail spam, or Resend rejecting that To address.",
+      );
+    }
   }
 }
 
