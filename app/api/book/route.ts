@@ -214,16 +214,20 @@ export async function POST(request: Request) {
       }
     }
 
-    notifyNewBooking({
-      name,
-      email,
-      address,
-      homeSize,
-      date: scheduledDate ? scheduledDate.toLocaleString() : null,
-      notes,
-    }).catch((emailErr) => {
+    try {
+      /* Await so Resend completes before the response closes; otherwise Vercel may freeze
+         the invocation and drop in-flight email work. */
+      await notifyNewBooking({
+        name,
+        email,
+        address,
+        homeSize,
+        date: scheduledDate ? scheduledDate.toLocaleString() : null,
+        notes,
+      });
+    } catch (emailErr) {
       console.error("[BOOKING] notifyNewBooking failed after booking create:", emailErr);
-    });
+    }
 
     return NextResponse.json({ success: true, id: booking.id });
   } catch (err) {
