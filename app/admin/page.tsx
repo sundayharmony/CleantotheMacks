@@ -2344,6 +2344,17 @@ function VideoReleasesTab({
                 <b>Signature (typed, legacy):</b> {selected.signatureText || "—"}
               </div>
             )}
+            {displayStatus(selected) === "SIGNED" ? (
+              <div style={{ marginTop: 16 }}>
+                <a
+                  className="btn btn-primary"
+                  href={`/api/video-release/pdf?id=${encodeURIComponent(selected.id)}`}
+                  download
+                >
+                  Download signed PDF
+                </a>
+              </div>
+            ) : null}
             <div style={{ marginTop: 12 }}>
               <b>Signer IP:</b> {selected.signerIp || "—"}
             </div>

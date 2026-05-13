@@ -108,6 +108,15 @@ export default function SignVideoReleaseForm({
         <p className="text-muted" style={{ fontSize: 15 }}>
           Your video / media release has been signed and recorded. You may close this page.
         </p>
+        <p style={{ marginTop: 22 }}>
+          <a
+            className="btn btn-primary btn-lg"
+            href={`/api/video-release/pdf?token=${encodeURIComponent(token)}`}
+            download
+          >
+            Download signed PDF
+          </a>
+        </p>
       </div>
     );
   }
