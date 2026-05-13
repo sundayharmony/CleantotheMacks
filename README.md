@@ -22,7 +22,10 @@ Copy `.env.example` to `.env` and fill in values. At minimum for local developme
 
 ```
 DATABASE_URL="file:./dev.db"
+NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
+
+Set **`NEXT_PUBLIC_APP_URL`** on **Vercel** to your live site (e.g. `https://www.cleantothemacks.com`). Video release emails build signing links from this; if it is missing, links can point at `localhost` or the default deployment host.
 
 ### Booking email (Resend)
 

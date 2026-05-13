@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { notifyVideoReleaseRequest } from "@/lib/email";
+import { getPublicSiteUrl } from "@/lib/site-url";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -56,11 +57,7 @@ export async function POST(request: Request) {
       },
     });
 
-    const baseUrl =
-      process.env.NEXT_PUBLIC_APP_URL ||
-      process.env.APP_URL ||
-      "http://localhost:3000";
-    const signingUrl = `${baseUrl.replace(/\/$/, "")}/video-release/${token}`;
+    const signingUrl = `${getPublicSiteUrl()}/video-release/${token}`;
 
     await notifyVideoReleaseRequest({
       clientName: release.clientName,
