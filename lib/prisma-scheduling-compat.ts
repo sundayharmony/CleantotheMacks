@@ -21,6 +21,9 @@ export type BusyBooking = {
   slotMinutes: number | null;
 };
 
+/** Statuses that occupy the calendar (pending NEW requests do not). */
+export const CALENDAR_BUSY_STATUSES = ["CONFIRMED", "COMPLETED"] as const;
+
 async function findBookingsWithSlot(where: Prisma.BookingWhereInput): Promise<BusyBooking[]> {
   try {
     const rows = await prisma.booking.findMany({
@@ -83,15 +86,23 @@ export async function safeBlockedSlotsForRange(from: Date, rangeEnd: Date) {
 export async function safeBookingsWithScheduledRange(from: Date, toInclusive: Date) {
   return findBookingsWithSlot({
     scheduledDate: { gte: from, lte: toInclusive },
-    status: { in: ["NEW", "CONFIRMED", "COMPLETED"] },
+    status: { in: [...CALENDAR_BUSY_STATUSES] },
   });
 }
 
-export async function safeBookingsForDay(dayStart: Date, dayEnd: Date) {
-  return findBookingsWithSlot({
+export async function safeBookingsForDay(
+  dayStart: Date,
+  dayEnd: Date,
+  excludeBookingId?: string,
+) {
+  const where: Prisma.BookingWhereInput = {
     scheduledDate: { gte: dayStart, lt: dayEnd },
-    status: { in: ["NEW", "CONFIRMED", "COMPLETED"] },
-  });
+    status: { in: [...CALENDAR_BUSY_STATUSES] },
+  };
+  if (excludeBookingId) {
+    where.id = { not: excludeBookingId };
+  }
+  return findBookingsWithSlot(where);
 }
 
 export async function safeAllBlockedSlots() {

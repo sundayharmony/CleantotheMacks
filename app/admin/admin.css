@@ -1217,6 +1217,13 @@ body:has(.admin-shell) {
   font-weight: 500;
   font-size: 11px;
 }
+.admin-shell .cal-chip.request {
+  border-style: dashed;
+  opacity: 0.88;
+}
+.admin-shell .cal-legend-swatch.request-swatch {
+  border-style: dashed;
+}
 .admin-shell .cal-more {
   font-size: 10px;
   color: var(--admin-text-muted);

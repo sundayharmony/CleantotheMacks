@@ -7,6 +7,7 @@ import {
   notifyBookingConfirmed,
   notifyBookingRescheduled,
 } from "@/lib/email";
+import { isSlotFree } from "@/lib/slot-availability";
 
 export const runtime = "nodejs"; // ensure Prisma runs in Node (not Edge)
 
@@ -152,11 +153,46 @@ export async function PATCH(req: Request, context: any) {
         address: true,
         scheduledDate: true,
         serviceType: true,
+        slotMinutes: true,
       },
     });
 
     if (!existing) {
       return NextResponse.json({ error: "Booking not found" }, { status: 404 });
+    }
+
+    const nextStatus = data.status ?? existing.status;
+    const nextScheduledDate =
+      data.scheduledDate !== undefined ? data.scheduledDate : existing.scheduledDate;
+    const nextSlotMinutes = existing.slotMinutes ?? 60;
+
+    const becomingConfirmed =
+      nextStatus === "CONFIRMED" && existing.status !== "CONFIRMED";
+    const isConfirmed = nextStatus === "CONFIRMED";
+    const dateChanged =
+      data.scheduledDate !== undefined &&
+      (existing.scheduledDate?.getTime() ?? null) !== (nextScheduledDate?.getTime() ?? null);
+
+    if (becomingConfirmed && !nextScheduledDate) {
+      return NextResponse.json(
+        { error: "Set an appointment date and time before confirming." },
+        { status: 400 },
+      );
+    }
+
+    if ((becomingConfirmed || (isConfirmed && dateChanged)) && nextScheduledDate) {
+      const free = await isSlotFree(nextScheduledDate, nextSlotMinutes, {
+        excludeBookingId: id,
+      });
+      if (!free) {
+        return NextResponse.json(
+          {
+            error:
+              "That time conflicts with another confirmed appointment or a blocked period. Pick a different time.",
+          },
+          { status: 409 },
+        );
+      }
     }
 
     const updated = await prisma.booking.update({
@@ -167,16 +203,10 @@ export async function PATCH(req: Request, context: any) {
     /* Decide which client emails to send based on transitions */
     const becameCanceled =
       data.status === "CANCELED" && existing.status !== "CANCELED";
-    const becameConfirmed =
-      data.status === "CONFIRMED" && existing.status !== "CONFIRMED" && !becameCanceled;
+    const becameConfirmed = becomingConfirmed && !becameCanceled;
 
     const oldDateMs = existing.scheduledDate?.getTime() ?? null;
-    const newDateMs =
-      data.scheduledDate === undefined
-        ? oldDateMs
-        : data.scheduledDate?.getTime() ?? null;
-    const dateChanged =
-      data.scheduledDate !== undefined && oldDateMs !== newDateMs;
+    const newDateMs = nextScheduledDate?.getTime() ?? null;
 
     if (becameCanceled) {
       notifyBookingCanceled({

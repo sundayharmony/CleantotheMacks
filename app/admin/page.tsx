@@ -308,6 +308,56 @@ function avatarHue(seed: string) {
   return h;
 }
 
+function statusLabel(status: string): string {
+  if (status === "NEW") return "Request";
+  return status;
+}
+
+function dayKeyFromDate(d: Date): string {
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+
+function dateFromDayKey(key: string): Date {
+  const [y, m, day] = key.split("-").map((n) => parseInt(n, 10));
+  return new Date(y, m, day);
+}
+
+function fullDayBlockRange(startDate: string, endDate: string): { startAt: string; endAt: string } {
+  const [sy, sm, sd] = startDate.split("-").map(Number);
+  const [ey, em, ed] = endDate.split("-").map(Number);
+  const start = new Date(sy, sm - 1, sd);
+  const end = new Date(ey, em - 1, ed + 1);
+  return { startAt: start.toISOString(), endAt: end.toISOString() };
+}
+
+function fullDayBlockRangeForDayKey(key: string): { startAt: string; endAt: string } {
+  const d = dateFromDayKey(key);
+  const end = new Date(d);
+  end.setDate(end.getDate() + 1);
+  return { startAt: d.toISOString(), endAt: end.toISOString() };
+}
+
+async function postBlockedRange(
+  range: { startAt: string; endAt: string; reason?: string },
+): Promise<void> {
+  const res = await fetch("/api/availability/block", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(range),
+  });
+  if (!res.ok) {
+    const d = await res.json().catch(() => null);
+    throw new Error((d as { error?: string } | null)?.error || "Failed to block");
+  }
+}
+
+async function deleteBlockedSlot(id: string): Promise<void> {
+  const res = await fetch(`/api/availability/block?id=${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error("Remove failed");
+}
+
 function pillClassForStatus(status: string): string {
   switch (status) {
     case "NEW":
@@ -343,7 +393,7 @@ function StatusBadge({
 }) {
   return (
     <span className={`pill ${pillClassForStatus(status)}${className ? ` ${className}` : ""}`}>
-      {label ?? status}
+      {label ?? statusLabel(status)}
     </span>
   );
 }
@@ -846,12 +896,16 @@ function BookingDetailModal({
     if (!saving) onClose();
   }
 
-  async function save() {
+  async function save(confirming = false) {
     if (!booking) return;
     setSaving(true);
     try {
       const scheduledDatePatch =
         draft.scheduledDate?.trim() ? new Date(draft.scheduledDate).toISOString() : null;
+      const status = confirming ? "CONFIRMED" : draft.status;
+      if (confirming && !scheduledDatePatch) {
+        throw new Error("Set an appointment date and time before confirming.");
+      }
       const res = await fetch(`/api/book/${booking.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -864,12 +918,12 @@ function BookingDetailModal({
           homeSize: draft.homeSize,
           sqft: draft.sqft,
           notes: draft.notes,
-          status: draft.status,
+          status,
           clientId: draft.clientId?.trim() ? draft.clientId : null,
           serviceType: draft.serviceType?.trim() || null,
           scheduledDate: scheduledDatePatch,
           cancellationReason:
-            draft.status === "CANCELED" && draft.cancellationReason?.trim()
+            status === "CANCELED" && draft.cancellationReason?.trim()
               ? draft.cancellationReason.trim()
               : null,
         }),
@@ -946,7 +1000,7 @@ function BookingDetailModal({
         <>
           <div className="modal-head">
             <div>
-              <h2>Booking Details</h2>
+              <h2>{booking.status === "NEW" ? "Request Details" : "Booking Details"}</h2>
               <p className="subtitle">Created: {fmt(booking.createdAt)}</p>
             </div>
             <button type="button" className="btn btn-outline btn-sm" onClick={close}>Close</button>
@@ -960,7 +1014,7 @@ function BookingDetailModal({
             <label>Sq Ft<input className="input" value={draft.sqft ?? ""} onChange={(e) => setDraft({ ...draft, sqft: e.target.value })} /></label>
             <label>Status
               <select className="input" value={draft.status ?? "NEW"} onChange={(e) => updateStatus(e.target.value)}>
-                <option value="NEW">NEW</option><option value="CONFIRMED">CONFIRMED</option><option value="COMPLETED">COMPLETED</option><option value="CANCELED">CANCELED</option>
+                <option value="NEW">Request</option><option value="CONFIRMED">CONFIRMED</option><option value="COMPLETED">COMPLETED</option><option value="CANCELED">CANCELED</option>
               </select>
             </label>
             <label>Link Client
@@ -981,7 +1035,9 @@ function BookingDetailModal({
             </label>
           </div>
           <label>
-            Appointment date &amp; time (optional)
+            {(draft.status ?? booking.status) === "NEW"
+              ? "Preferred date & time"
+              : "Confirmed appointment"}
             <input
               type="datetime-local"
               className="input"
@@ -989,7 +1045,9 @@ function BookingDetailModal({
               onChange={(e) => setDraft({ ...draft, scheduledDate: e.target.value })}
             />
             <small style={{ display: "block", marginTop: 6 }}>
-              Fills the Schedule calendar and list. Requests submitted before scheduling launched have no date—set one here, or leave blank.
+              {(draft.status ?? booking.status) === "NEW"
+                ? "Customer's preferred time — adjust if needed, then confirm the appointment."
+                : "Shown on the schedule calendar once confirmed."}
             </small>
           </label>
           <label>Address<input className="input" value={draft.address ?? ""} onChange={(e) => setDraft({ ...draft, address: e.target.value })} /></label>
@@ -1030,7 +1088,17 @@ function BookingDetailModal({
               >
                 {sendingRelease ? "Sending..." : "Send Video Release"}
               </button>
-              <button type="button" className="btn btn-primary" onClick={save} disabled={saving}>{saving ? "Saving…" : "Save Changes"}</button>
+              {booking.status === "NEW" || draft.status === "NEW" ? (
+                <button
+                  type="button"
+                  className="btn btn-success"
+                  onClick={() => save(true)}
+                  disabled={saving}
+                >
+                  {saving ? "Confirming…" : "Confirm appointment"}
+                </button>
+              ) : null}
+              <button type="button" className="btn btn-primary" onClick={() => save()} disabled={saving}>{saving ? "Saving…" : "Save Changes"}</button>
             </div>
           </div>
         </>
@@ -1119,7 +1187,7 @@ function BookingsTab({ bookings, cleaners, onOpenBooking, initialFilter, clearIn
 
   const chipOpts: { key: "ALL" | BookingStatus; label: string }[] = [
     { key: "ALL", label: "All" },
-    { key: "NEW", label: "NEW" },
+    { key: "NEW", label: "Requests" },
     { key: "CONFIRMED", label: "Confirmed" },
     { key: "COMPLETED", label: "Completed" },
     { key: "CANCELED", label: "Canceled" },
@@ -2388,6 +2456,65 @@ function DashboardTab({
   jumpToBookingsFiltered: (filter: "ALL" | BookingStatus) => void;
   onOpenBooking: (id: string) => void;
 }) {
+  const [blockedSlots, setBlockedSlots] = useState<BlockedSlot[]>([]);
+  const [dashBlockDraft, setDashBlockDraft] = useState({ startDate: "", endDate: "", reason: "" });
+  const [dashBlockBusy, setDashBlockBusy] = useState(false);
+
+  const loadBlocked = useCallback(async () => {
+    try {
+      const res = await fetch("/api/availability/block", { cache: "no-store" });
+      if (res.ok) {
+        const data = await res.json();
+        setBlockedSlots(data.blocks ?? []);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  useEffect(() => {
+    loadBlocked();
+  }, [loadBlocked]);
+
+  async function dashBlockDates() {
+    if (!dashBlockDraft.startDate || !dashBlockDraft.endDate) {
+      alert("Please pick a start and end date.");
+      return;
+    }
+    if (dashBlockDraft.endDate < dashBlockDraft.startDate) {
+      alert("End date must be on or after start date.");
+      return;
+    }
+    setDashBlockBusy(true);
+    try {
+      const range = fullDayBlockRange(dashBlockDraft.startDate, dashBlockDraft.endDate);
+      await postBlockedRange({ ...range, reason: dashBlockDraft.reason || undefined });
+      setDashBlockDraft({ startDate: "", endDate: "", reason: "" });
+      await loadBlocked();
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : "Failed to block");
+    } finally {
+      setDashBlockBusy(false);
+    }
+  }
+
+  async function dashRemoveBlock(id: string) {
+    if (!window.confirm("Remove this blocked period?")) return;
+    try {
+      await deleteBlockedSlot(id);
+      await loadBlocked();
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : "Failed to remove");
+    }
+  }
+
+  const upcomingBlocks = useMemo(() => {
+    const nowMs = Date.now();
+    return blockedSlots
+      .filter((b) => new Date(b.endAt).getTime() > nowMs)
+      .slice(0, 8);
+  }, [blockedSlots]);
+
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
@@ -2404,7 +2531,7 @@ function DashboardTab({
   const todayAppointments = useMemo(() => {
     return bookings
       .filter((b) => {
-        if (!b.scheduledDate || b.status === "CANCELED") return false;
+        if (!b.scheduledDate || b.status !== "CONFIRMED") return false;
         const d = new Date(b.scheduledDate);
         return d >= todayStart && d < todayEnd;
       })
@@ -2421,7 +2548,7 @@ function DashboardTab({
       const dayEnd = addDays(todayStart, i + 1);
       const items = bookings
         .filter((b) => {
-          if (!b.scheduledDate || b.status === "CANCELED") return false;
+          if (!b.scheduledDate || b.status !== "CONFIRMED") return false;
           const d = new Date(b.scheduledDate);
           return d >= dayStart && d < dayEnd;
         })
@@ -2492,7 +2619,7 @@ function DashboardTab({
         <KpiCard
           label="Pending requests"
           value={newBookings}
-          foot="New bookings to review"
+          foot="Requests awaiting confirmation"
           tone="warning"
           onClick={() => jumpToBookingsFiltered("NEW")}
         />
@@ -2646,6 +2773,63 @@ function DashboardTab({
             </div>
           )}
         </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 20 }}>
+        <h3 style={{ marginTop: 0 }}>Block dates</h3>
+        <p className="text-muted" style={{ margin: "0 0 12px", fontSize: 13 }}>
+          Mark vacation or time off — customers won&apos;t be able to book those days.
+        </p>
+        <div className="grid grid-2" style={{ marginBottom: 12 }}>
+          <label>Start date
+            <input
+              type="date"
+              className="input"
+              value={dashBlockDraft.startDate}
+              onChange={(e) => setDashBlockDraft({ ...dashBlockDraft, startDate: e.target.value })}
+            />
+          </label>
+          <label>End date
+            <input
+              type="date"
+              className="input"
+              value={dashBlockDraft.endDate}
+              onChange={(e) => setDashBlockDraft({ ...dashBlockDraft, endDate: e.target.value })}
+            />
+          </label>
+        </div>
+        <label style={{ display: "block", marginBottom: 12 }}>Reason (optional)
+          <input
+            className="input"
+            value={dashBlockDraft.reason}
+            onChange={(e) => setDashBlockDraft({ ...dashBlockDraft, reason: e.target.value })}
+            placeholder="e.g. Vacation"
+          />
+        </label>
+        <div className="row" style={{ justifyContent: "space-between", marginBottom: upcomingBlocks.length ? 16 : 0 }}>
+          <button type="button" className="btn btn-primary btn-sm" onClick={dashBlockDates} disabled={dashBlockBusy}>
+            {dashBlockBusy ? "Saving…" : "Block dates"}
+          </button>
+          <button type="button" className="btn btn-outline btn-sm" onClick={() => setTab("schedule")}>
+            Open schedule
+          </button>
+        </div>
+        {upcomingBlocks.length > 0 && (
+          <div className="stack stack-sm">
+            <small className="text-muted">Upcoming blocked periods</small>
+            {upcomingBlocks.map((b) => (
+              <div key={b.id} className="row" style={{ justifyContent: "space-between", gap: 8 }}>
+                <span style={{ fontSize: 13 }}>
+                  {fmt(b.startAt)} – {fmt(b.endAt)}
+                  {b.reason ? ` · ${b.reason}` : ""}
+                </span>
+                <RowAction variant="danger" onClick={() => dashRemoveBlock(b.id)}>
+                  Remove
+                </RowAction>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="card">
@@ -3179,6 +3363,8 @@ function ScheduleTab({ bookings, cleaners, reload, setTab, onOpenBooking }: {
   const [loadingCfg, setLoadingCfg] = useState(false);
   const [savingCfg, setSavingCfg] = useState(false);
   const [blockDraft, setBlockDraft] = useState({ startAt: "", endAt: "", reason: "" });
+  const [fullDayDraft, setFullDayDraft] = useState({ startDate: "", endDate: "", reason: "" });
+  const [dayBlockReason, setDayBlockReason] = useState("");
   const [busyBlock, setBusyBlock] = useState(false);
 
   const pendingNoDate = useMemo(
@@ -3356,20 +3542,53 @@ function ScheduleTab({ bookings, cleaners, reload, setTab, onOpenBooking }: {
     }
     setBusyBlock(true);
     try {
-      const res = await fetch("/api/availability/block", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          startAt: new Date(blockDraft.startAt).toISOString(),
-          endAt: new Date(blockDraft.endAt).toISOString(),
-          reason: blockDraft.reason || undefined,
-        }),
+      await postBlockedRange({
+        startAt: new Date(blockDraft.startAt).toISOString(),
+        endAt: new Date(blockDraft.endAt).toISOString(),
+        reason: blockDraft.reason || undefined,
       });
-      if (!res.ok) {
-        const d = await res.json().catch(() => null);
-        throw new Error(d?.error || "Failed to block");
-      }
       setBlockDraft({ startAt: "", endAt: "", reason: "" });
+      await loadScheduleData();
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : "Failed to block");
+    } finally {
+      setBusyBlock(false);
+    }
+  }
+
+  async function addFullDayBlock(
+    startDate: string,
+    endDate: string,
+    reason?: string,
+  ) {
+    if (!startDate || !endDate) {
+      alert("Please pick a start and end date.");
+      return;
+    }
+    if (endDate < startDate) {
+      alert("End date must be on or after start date.");
+      return;
+    }
+    setBusyBlock(true);
+    try {
+      const range = fullDayBlockRange(startDate, endDate);
+      await postBlockedRange({ ...range, reason: reason || undefined });
+      setFullDayDraft({ startDate: "", endDate: "", reason: "" });
+      setDayBlockReason("");
+      await loadScheduleData();
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : "Failed to block");
+    } finally {
+      setBusyBlock(false);
+    }
+  }
+
+  async function blockDayFromModal(dayKey: string) {
+    setBusyBlock(true);
+    try {
+      const range = fullDayBlockRangeForDayKey(dayKey);
+      await postBlockedRange({ ...range, reason: dayBlockReason.trim() || undefined });
+      setDayBlockReason("");
       await loadScheduleData();
     } catch (e: unknown) {
       alert(e instanceof Error ? e.message : "Failed to block");
@@ -3381,10 +3600,7 @@ function ScheduleTab({ bookings, cleaners, reload, setTab, onOpenBooking }: {
   async function removeBlock(id: string) {
     if (!window.confirm("Remove this blocked time?")) return;
     try {
-      const res = await fetch(`/api/availability/block?id=${encodeURIComponent(id)}`, {
-        method: "DELETE",
-      });
-      if (!res.ok) throw new Error("Remove failed");
+      await deleteBlockedSlot(id);
       await loadScheduleData();
     } catch (e: unknown) {
       alert(e instanceof Error ? e.message : "Failed to remove");
@@ -3444,7 +3660,7 @@ function ScheduleTab({ bookings, cleaners, reload, setTab, onOpenBooking }: {
               const key = `${cell.date.getFullYear()}-${cell.date.getMonth()}-${cell.date.getDate()}`;
               const dayBookings = bookingsByDay.get(key) ?? [];
               const isToday = cell.date.toDateString() === new Date().toDateString();
-              const clickable = dayBookings.length > 0;
+              const clickable = cell.inMonth;
               const rule = ruleByDow.get(cell.date.getDay());
               const dowClosed = cell.inMonth && rule !== undefined && rule.enabled === false;
               const dayBlocks = blocksByDayKey.get(key) ?? [];
@@ -3471,6 +3687,7 @@ function ScheduleTab({ bookings, cleaners, reload, setTab, onOpenBooking }: {
                   <div style={{ display: "grid", gap: 3 }}>
                     {dayBookings.slice(0, 3).map((b) => {
                       const isCanceled = b.status === "CANCELED";
+                      const isRequest = b.status === "NEW";
                       const t = new Date(b.scheduledDate!).toLocaleTimeString([], {
                         hour: "numeric",
                         minute: "2-digit",
@@ -3478,10 +3695,10 @@ function ScheduleTab({ bookings, cleaners, reload, setTab, onOpenBooking }: {
                       return (
                         <span
                           key={b.id}
-                          title={`${b.name} - ${b.address}${isCanceled ? " (canceled)" : ""}`}
-                          className={`cal-chip pill ${pillClassForStatus(b.status)}${isCanceled ? " canceled" : ""}`}
+                          title={`${isRequest ? "Request: " : ""}${b.name} - ${b.address}${isCanceled ? " (canceled)" : ""}`}
+                          className={`cal-chip pill ${pillClassForStatus(b.status)}${isCanceled ? " canceled" : ""}${isRequest ? " request" : ""}`}
                         >
-                          {t} {b.name}
+                          {isRequest ? "Req " : ""}{t} {b.name}
                         </span>
                       );
                     })}
@@ -3505,7 +3722,7 @@ function ScheduleTab({ bookings, cleaners, reload, setTab, onOpenBooking }: {
                   onClick={() => setOpenDayKey(key)}
                   className={`${cellClass} schedule-day-cell`}
                   title={blockTooltip}
-                  aria-label={`Open ${cell.date.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric", year: "numeric" })} (${dayBookings.length} booking${dayBookings.length === 1 ? "" : "s"})`}
+                  aria-label={`Open ${cell.date.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric", year: "numeric" })}${dayBookings.length ? ` (${dayBookings.length} booking${dayBookings.length === 1 ? "" : "s"})` : ""}`}
                 >
                   {cellChildren}
                 </button>
@@ -3530,6 +3747,10 @@ function ScheduleTab({ bookings, cleaners, reload, setTab, onOpenBooking }: {
                 style={{ borderLeft: "3px solid var(--admin-warning)", border: "1px solid var(--admin-border)", borderLeftWidth: 3 }}
               />
               Has blocked time
+            </span>
+            <span>
+              <span className="cal-legend-swatch request-swatch" />
+              Pending request
             </span>
             <span>
               <span className="cal-more" style={{ textDecoration: "line-through", opacity: 0.55 }}>
@@ -3795,7 +4016,54 @@ function ScheduleTab({ bookings, cleaners, reload, setTab, onOpenBooking }: {
       {view === "blocked" && (
         <>
           <div className="card" style={{ display: "grid", gap: 12, marginBottom: 16 }}>
-            <h3 style={{ margin: 0, fontSize: 18 }}>Block Time Range</h3>
+            <h3 style={{ margin: 0, fontSize: 18 }}>Block full days</h3>
+            <p className="text-muted" style={{ margin: 0, fontSize: 13 }}>
+              Quick vacation or out-of-office — blocks entire days on the public booking calendar.
+            </p>
+            <div className="grid grid-2">
+              <label>Start date
+                <input
+                  type="date"
+                  className="input"
+                  value={fullDayDraft.startDate}
+                  onChange={(e) => setFullDayDraft({ ...fullDayDraft, startDate: e.target.value })}
+                />
+              </label>
+              <label>End date
+                <input
+                  type="date"
+                  className="input"
+                  value={fullDayDraft.endDate}
+                  onChange={(e) => setFullDayDraft({ ...fullDayDraft, endDate: e.target.value })}
+                />
+              </label>
+            </div>
+            <label>Reason (optional)
+              <input
+                className="input"
+                value={fullDayDraft.reason}
+                onChange={(e) => setFullDayDraft({ ...fullDayDraft, reason: e.target.value })}
+                placeholder="e.g. Vacation"
+              />
+            </label>
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <button
+                className="btn btn-primary"
+                onClick={() =>
+                  addFullDayBlock(fullDayDraft.startDate, fullDayDraft.endDate, fullDayDraft.reason)
+                }
+                disabled={busyBlock}
+              >
+                {busyBlock ? "Saving..." : "Block dates"}
+              </button>
+            </div>
+          </div>
+
+          <div className="card" style={{ display: "grid", gap: 12, marginBottom: 16 }}>
+            <h3 style={{ margin: 0, fontSize: 18 }}>Block time range</h3>
+            <p className="text-muted" style={{ margin: 0, fontSize: 13 }}>
+              Partial-day blocks (e.g. afternoon off).
+            </p>
             <div className="grid grid-2">
               <label>Start
                 <input
@@ -3857,39 +4125,78 @@ function ScheduleTab({ bookings, cleaners, reload, setTab, onOpenBooking }: {
         </>
       )}
 
-      <Modal open={!!openDayKey} onClose={() => setOpenDayKey(null)}>
+      <Modal open={!!openDayKey} onClose={() => { setOpenDayKey(null); setDayBlockReason(""); }}>
         {openDayKey && (() => {
           const dayBookings = (bookingsByDay.get(openDayKey) ?? [])
             .slice()
             .sort((a, b) => new Date(a.scheduledDate!).getTime() - new Date(b.scheduledDate!).getTime());
-          const sample = dayBookings[0]?.scheduledDate
-            ? new Date(dayBookings[0].scheduledDate)
-            : (() => {
-                const [y, m, d] = openDayKey.split("-").map((n) => parseInt(n, 10));
-                return new Date(y, m, d);
-              })();
+          const dayBlocks = blocksByDayKey.get(openDayKey) ?? [];
+          const sample = dateFromDayKey(openDayKey);
           const titleDate = sample.toLocaleDateString([], {
             weekday: "long", month: "long", day: "numeric", year: "numeric",
           });
+          const confirmed = dayBookings.filter((b) => b.status === "CONFIRMED" || b.status === "COMPLETED");
+          const requests = dayBookings.filter((b) => b.status === "NEW");
+          const other = dayBookings.filter((b) => b.status !== "NEW" && b.status !== "CONFIRMED" && b.status !== "COMPLETED");
           return (
             <>
               <div className="modal-head">
                 <div>
                   <h2>{titleDate}</h2>
                   <p className="subtitle">
-                    {dayBookings.length} booking{dayBookings.length === 1 ? "" : "s"} scheduled
+                    {confirmed.length} confirmed · {requests.length} request{requests.length === 1 ? "" : "s"}
                   </p>
                 </div>
-                <button type="button" className="btn btn-outline btn-sm" onClick={() => setOpenDayKey(null)}>
+                <button type="button" className="btn btn-outline btn-sm" onClick={() => { setOpenDayKey(null); setDayBlockReason(""); }}>
                   Close
                 </button>
               </div>
 
+              <div className="card" style={{ display: "grid", gap: 10, marginBottom: 16, padding: 14 }}>
+                <strong style={{ fontSize: 14 }}>Block this day</strong>
+                <label>Reason (optional)
+                  <input
+                    className="input"
+                    value={dayBlockReason}
+                    onChange={(e) => setDayBlockReason(e.target.value)}
+                    placeholder="e.g. Vacation"
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  style={{ justifySelf: "start" }}
+                  disabled={busyBlock}
+                  onClick={() => blockDayFromModal(openDayKey)}
+                >
+                  {busyBlock ? "Blocking…" : "Block entire day"}
+                </button>
+              </div>
+
+              {dayBlocks.length > 0 && (
+                <div style={{ marginBottom: 16 }}>
+                  <h3 style={{ margin: "0 0 8px", fontSize: 14 }}>Blocked on this day</h3>
+                  <div className="stack stack-sm">
+                    {dayBlocks.map((blk) => (
+                      <div key={blk.id} className="row" style={{ justifyContent: "space-between", gap: 8 }}>
+                        <span className="text-muted" style={{ fontSize: 13 }}>
+                          {fmt(blk.startAt)} – {fmt(blk.endAt)}
+                          {blk.reason ? ` · ${blk.reason}` : ""}
+                        </span>
+                        <RowAction variant="danger" onClick={() => removeBlock(blk.id)}>
+                          Remove
+                        </RowAction>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {dayBookings.length === 0 ? (
-                <p className="text-muted">No bookings on this day.</p>
+                <p className="text-muted">No bookings or requests on this day.</p>
               ) : (
                 <div className="stack">
-                  {dayBookings.map((b) => (
+                  {[...confirmed, ...requests, ...other].map((b) => (
                     <button
                       key={b.id}
                       type="button"
@@ -3897,6 +4204,7 @@ function ScheduleTab({ bookings, cleaners, reload, setTab, onOpenBooking }: {
                       onClick={() => {
                         onOpenBooking(b.id);
                         setOpenDayKey(null);
+                        setDayBlockReason("");
                       }}
                     >
                       <span className="agenda-time">

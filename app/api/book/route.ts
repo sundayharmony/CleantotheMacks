@@ -3,18 +3,7 @@ import { cookies } from "next/headers";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { notifyNewBooking } from "@/lib/email";
-import {
-  safeAvailabilityConfigForDay,
-  safeBlockedSlotsForDay,
-  safeBookingsForDay,
-} from "@/lib/prisma-scheduling-compat";
-import {
-  AvailabilityRule,
-  DEFAULT_AVAILABILITY,
-  generateSlotsForDate,
-  overlapsAny,
-  SlotRange,
-} from "@/lib/scheduling";
+import { isSlotFree } from "@/lib/slot-availability";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,50 +15,6 @@ const SERVICE_TYPES = new Set([
   "recurring",
   "painting",
 ]);
-
-async function isSlotAvailable(scheduledDate: Date, slotMinutes: number): Promise<boolean> {
-  const dayStart = new Date(
-    scheduledDate.getFullYear(),
-    scheduledDate.getMonth(),
-    scheduledDate.getDate(),
-  );
-  const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
-
-  const [configRows, bookings, blocks] = await Promise.all([
-    safeAvailabilityConfigForDay(scheduledDate.getDay()),
-    safeBookingsForDay(dayStart, dayEnd),
-    safeBlockedSlotsForDay(dayStart, dayEnd),
-  ]);
-
-  const rule: AvailabilityRule =
-    configRows[0] ?? DEFAULT_AVAILABILITY[scheduledDate.getDay()];
-
-  if (!rule.enabled) return false;
-
-  const slots = generateSlotsForDate(scheduledDate, rule);
-  const matched = slots.find(
-    (s) =>
-      s.startAt.getTime() === scheduledDate.getTime() &&
-      s.endAt.getTime() - s.startAt.getTime() === slotMinutes * 60 * 1000,
-  );
-  if (!matched) return false;
-
-  const busy: SlotRange[] = [];
-  for (const b of bookings) {
-    if (!b.scheduledDate) continue;
-    /* slotMinutes is null on legacy rows / pre-migration DBs; default to 60 */
-    const minutes = b.slotMinutes ?? 60;
-    busy.push({
-      startAt: b.scheduledDate,
-      endAt: new Date(b.scheduledDate.getTime() + minutes * 60 * 1000),
-    });
-  }
-  for (const block of blocks) {
-    busy.push({ startAt: block.startAt, endAt: block.endAt });
-  }
-
-  return !overlapsAny(matched, busy);
-}
 
 export async function POST(request: Request) {
   const body = (await request.json()) as {
@@ -134,10 +79,10 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
-    const ok = await isSlotAvailable(scheduledDate, slotMinutes);
+    const ok = await isSlotFree(scheduledDate, slotMinutes);
     if (!ok) {
       return NextResponse.json(
-        { success: false, error: "That time slot is no longer available" },
+        { success: false, error: "That preferred time is not available — pick another slot or add a note" },
         { status: 409 },
       );
     }

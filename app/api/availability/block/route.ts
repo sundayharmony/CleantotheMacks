@@ -32,11 +32,24 @@ export async function POST(request: Request) {
   const body = (await request.json()) as {
     startAt?: string;
     endAt?: string;
+    startDate?: string;
+    endDate?: string;
     reason?: string;
   };
 
-  const startAt = body.startAt ? new Date(body.startAt) : null;
-  const endAt = body.endAt ? new Date(body.endAt) : null;
+  let startAt: Date | null = body.startAt ? new Date(body.startAt) : null;
+  let endAt: Date | null = body.endAt ? new Date(body.endAt) : null;
+
+  if (body.startDate && body.endDate) {
+    const dateMatch = /^(\d{4})-(\d{2})-(\d{2})$/;
+    const sm = dateMatch.exec(body.startDate);
+    const em = dateMatch.exec(body.endDate);
+    if (!sm || !em) {
+      return NextResponse.json({ error: "Invalid startDate/endDate" }, { status: 400 });
+    }
+    startAt = new Date(Number(sm[1]), Number(sm[2]) - 1, Number(sm[3]));
+    endAt = new Date(Number(em[1]), Number(em[2]) - 1, Number(em[3]) + 1);
+  }
 
   if (!startAt || !endAt || Number.isNaN(startAt.getTime()) || Number.isNaN(endAt.getTime())) {
     return NextResponse.json({ error: "Invalid start/end" }, { status: 400 });

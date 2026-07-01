@@ -354,9 +354,9 @@ export default function BookPage() {
     <>
       <PageHero
         compact
-        eyebrow="Booking"
-        title="Book your appointment"
-        subtitle="Pick a service, choose a time that works, and we'll confirm by email."
+        eyebrow="Request"
+        title="Request a cleaning"
+        subtitle="Pick a service and your preferred time — we'll confirm the final appointment after reviewing your request."
       />
 
       <section className="section section-tight" style={{ paddingTop: 0 }}>
@@ -373,7 +373,7 @@ export default function BookPage() {
                 </span>
                 <span className="step-divider" />
                 <span className={`step ${stepStatus[1]}`}>
-                  <span className="step-num">2</span> Schedule
+                  <span className="step-num">2</span> Preferred time
                 </span>
                 <span className="step-divider" />
                 <span className={`step ${stepStatus[2]}`}>
@@ -425,10 +425,11 @@ export default function BookPage() {
                     padding: 0,
                   }}
                 >
-                  2. Choose a date and time
+                  2. Preferred date and time
                 </legend>
                 <p className="helper-text" style={{ marginBottom: 14 }}>
-                  Available within the next 30 days.
+                  Pick a time that works for you — this is your preference, not a confirmed appointment.
+                  We&apos;ll follow up to finalize the schedule.
                 </p>
 
                 {loadingSlots ? (
@@ -618,7 +619,7 @@ export default function BookPage() {
                   disabled={loading || !ready}
                   className="btn btn-primary btn-lg"
                 >
-                  {loading ? "Submitting…" : "Confirm Booking"}
+                  {loading ? "Submitting…" : "Submit request"}
                 </button>
               </div>
             </form>

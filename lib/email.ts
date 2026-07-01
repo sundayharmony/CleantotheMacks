@@ -162,13 +162,14 @@ export async function notifyNewBooking(booking: {
   const clientHtml = wrap(`
       <h2 style="color: #111; font-size: 18px;">Thanks, ${safeName} — we got your request!</h2>
       <p style="color: #374151; line-height: 1.6;">
-        Your booking request has been received and is <strong>pending confirmation</strong>.
-        We'll review it shortly and send a separate confirmation email once your appointment is approved.
+        Your cleaning request has been received and is <strong>pending confirmation</strong>.
+        The time below is your <strong>preference</strong> — we'll contact you if needed and send a
+        separate confirmation email once your appointment is finalized.
       </p>
       <div style="background: #f9fafb; padding: 16px; border-radius: 8px; margin: 16px 0;">
         <p style="margin: 4px 0;"><strong>Address:</strong> ${safeAddress}</p>
         <p style="margin: 4px 0;"><strong>Home size:</strong> ${safeHomeSize}</p>
-        ${safeDate ? `<p style="margin: 4px 0;"><strong>Requested time:</strong> ${safeDate}</p>` : ""}
+        ${safeDate ? `<p style="margin: 4px 0;"><strong>Preferred time:</strong> ${safeDate}</p>` : ""}
         ${safeNotes ? `<p style="margin: 4px 0;"><strong>Notes:</strong> ${safeNotes}</p>` : ""}
       </div>
       <p style="color: #374151; line-height: 1.6;">If anything looks wrong or you have questions, just reply to this email.</p>
@@ -180,10 +181,10 @@ export async function notifyNewBooking(booking: {
         <p style="margin: 4px 0;"><strong>Client:</strong> ${safeName} (${safeEmail})</p>
         <p style="margin: 4px 0;"><strong>Address:</strong> ${safeAddress}</p>
         <p style="margin: 4px 0;"><strong>Home size:</strong> ${safeHomeSize}</p>
-        ${safeDate ? `<p style="margin: 4px 0;"><strong>Requested time:</strong> ${safeDate}</p>` : ""}
+        ${safeDate ? `<p style="margin: 4px 0;"><strong>Preferred time:</strong> ${safeDate}</p>` : ""}
         ${safeNotes ? `<p style="margin: 4px 0;"><strong>Notes:</strong> ${safeNotes}</p>` : ""}
       </div>
-      <p style="color: #374151;">Log in to the admin dashboard to approve, assign a cleaner, or cancel.</p>
+      <p style="color: #374151;">Log in to the admin dashboard to confirm the appointment, assign a cleaner, or cancel.</p>
     `);
 
   const [clientOk, adminOk] = await Promise.all([

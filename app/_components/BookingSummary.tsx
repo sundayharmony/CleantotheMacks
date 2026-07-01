@@ -16,18 +16,18 @@ export default function BookingSummary({
   ready?: boolean;
 }) {
   return (
-    <aside className="summary-card" aria-label="Booking summary">
-      <h3>Your booking</h3>
+    <aside className="summary-card" aria-label="Request summary">
+      <h3>Your request</h3>
       <div className="summary-row">
         <span className="label">Service</span>
         <span className="value">{serviceLabel || <span className="text-subtle">Not selected</span>}</span>
       </div>
       <div className="summary-row">
-        <span className="label">Date</span>
+        <span className="label">Preferred date</span>
         <span className="value">{dateLabel || <span className="text-subtle">Not selected</span>}</span>
       </div>
       <div className="summary-row">
-        <span className="label">Time</span>
+        <span className="label">Preferred time</span>
         <span className="value">{timeLabel || <span className="text-subtle">Not selected</span>}</span>
       </div>
       <div className="summary-row">
@@ -42,8 +42,8 @@ export default function BookingSummary({
         </svg>
         <span>
           {ready
-            ? "Ready to confirm. Submit when you're done."
-            : "Complete the steps to confirm your appointment."}
+            ? "Ready to submit. We'll confirm your appointment after reviewing your request."
+            : "Complete the steps to submit your request."}
         </span>
       </div>
       {footer}
